@@ -17,6 +17,12 @@ const DROP_API_URL = (process.env.DROP_API_URL || 'http://127.0.0.1:3000').repla
 const DROP_ADMIN_API_KEY = process.env.DROP_ADMIN_API_KEY || '';
 const DASHBOARD_URL = (process.env.DASHBOARD_URL || DROP_API_URL).replace(/\/$/, '') + '/dashboard';
 
+const WAITLIST_JOIN_LIMIT = parseInt(process.env.WAITLIST_JOIN_LIMIT || '20', 10);
+const WAITLIST_JOIN_WINDOW_MS = parseInt(process.env.WAITLIST_JOIN_WINDOW_MS || '3600000', 10);
+const WAITLIST_EMAIL_BUDGET_PER_HOUR = parseInt(process.env.WAITLIST_EMAIL_BUDGET_PER_HOUR || '200', 10);
+const TRUSTED_PROXY_IPS = (process.env.TRUSTED_PROXY_IPS || '')
+  .split(',').map((s) => s.trim()).filter(Boolean);
+
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 module.exports = {
@@ -30,5 +36,9 @@ module.exports = {
   DROP_API_URL,
   DROP_ADMIN_API_KEY,
   DASHBOARD_URL,
+  WAITLIST_JOIN_LIMIT,
+  WAITLIST_JOIN_WINDOW_MS,
+  WAITLIST_EMAIL_BUDGET_PER_HOUR,
+  TRUSTED_PROXY_IPS,
   EMAIL_RE,
 };

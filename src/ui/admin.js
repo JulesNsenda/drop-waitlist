@@ -108,6 +108,17 @@
       populateTemplate('confirmation', s.templates.confirmation);
       populateTemplate('invite', s.templates.invite);
 
+      // signup stats (client-side from loaded entries)
+      const total    = e.entries.length;
+      const pending  = e.entries.filter((x) => x.status === 'pending').length;
+      const approved = e.entries.filter((x) => x.status === 'approved').length;
+      const invited  = e.entries.filter((x) => x.status === 'invited').length;
+      const week     = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      const recent   = e.entries.filter((x) => new Date(x.createdAt).getTime() >= week).length;
+      document.getElementById('stats').textContent =
+        `Total: ${total} · Pending: ${pending} · Approved: ${approved} · Invited: ${invited}` +
+        (recent ? `  (${recent} joined in the last 7 days)` : '');
+
       // waitlist table
       document.getElementById('invite-gate').textContent = s.invitesEnabled
         ? ''
@@ -236,6 +247,32 @@
     };
   }
 
+  // ── CSV download ───────────────────────────────────────────────────────────
+  async function downloadCsv() {
+    const btn = document.getElementById('export-csv-btn');
+    btn.disabled = true;
+    btn.textContent = 'Downloading…';
+    try {
+      const r = await fetch('/api/admin/export.csv', { headers: authHeaders() });
+      if (r.status === 403) { alert('Forbidden — check token.'); return; }
+      if (!r.ok) { alert('Export failed.'); return; }
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'waitlist.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      alert('Export failed — network error.');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Download CSV';
+    }
+  }
+
   // ── wire up ────────────────────────────────────────────────────────────────
   document.getElementById('load-btn').addEventListener('click', load);
   tok.addEventListener('keydown', (e) => { if (e.key === 'Enter') load(); });
@@ -244,6 +281,7 @@
   document.getElementById('save-invite').addEventListener('click', makeSaveHandler('invite'));
   document.getElementById('reset-confirmation').addEventListener('click', makeResetHandler('confirmation'));
   document.getElementById('reset-invite').addEventListener('click', makeResetHandler('invite'));
+  document.getElementById('export-csv-btn').addEventListener('click', downloadCsv);
 
   // auto-load if token was remembered from last session
   if (tok.value) load();

@@ -55,14 +55,47 @@ function renderTemplate(templateHtml, vars) {
   return out;
 }
 
+// ── plain-text fallback ───────────────────────────────────────────────────────
+
+// Best-effort HTML→plain-text converter. Preserves hrefs (strip-only would
+// drop the dashboard URL in invite emails). Unescapes &amp; last to avoid
+// double-converting &amp;lt; → &lt; → <.
+function htmlToText(html) {
+  return html
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<a\s[^>]*href=["']([^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi, (_, href, inner) => {
+      const t = inner.replace(/<[^>]+>/g, '').trim();
+      return href && href !== t ? `${t} (${href})` : t;
+    })
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|h[1-6]|tr|li|blockquote)>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 // ── send helpers ──────────────────────────────────────────────────────────────
+
+let _inFlight = 0;
+const MAX_IN_FLIGHT = 10;
+
 async function sendEmail({ to, subject, html }) {
   if (!RESEND_API_KEY) return { sent: false, error: 'email not configured (RESEND_API_KEY unset)' };
+  if (_inFlight >= MAX_IN_FLIGHT) return { sent: false, error: 'too many concurrent sends' };
+  const text = htmlToText(html);
+  _inFlight++;
   try {
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from: EMAIL_FROM, to: [to], subject, html }),
+      body: JSON.stringify({ from: EMAIL_FROM, to: [to], subject, html, text }),
     });
     if (!res.ok) {
       const detail = await res.text().catch(() => '');
@@ -71,6 +104,8 @@ async function sendEmail({ to, subject, html }) {
     return { sent: true };
   } catch (err) {
     return { sent: false, error: err && err.message ? err.message : 'send failed' };
+  } finally {
+    _inFlight--;
   }
 }
 
@@ -107,4 +142,5 @@ module.exports = {
   getEffectiveTemplate,
   DEFAULT_TEMPLATES,
   escapeHtml,
+  htmlToText,
 };

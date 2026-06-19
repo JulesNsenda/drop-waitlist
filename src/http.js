@@ -29,13 +29,18 @@ function readJsonBody(req) {
   });
 }
 
+// Timing-safe string comparison via SHA-256 — hashing to fixed-length digests
+// removes the length branch that would otherwise leak token length.
+function safeEqual(a, b) {
+  const h = (s) => crypto.createHash('sha256').update(String(s)).digest();
+  return crypto.timingSafeEqual(h(a), h(b));
+}
+
 function adminAuthorized(req) {
   if (!ADMIN_TOKEN) return false;
   const header = req.headers['authorization'] || '';
   const provided = header.startsWith('Bearer ') ? header.slice(7) : (req.headers['x-admin-token'] || '');
-  const a = Buffer.from(String(provided));
-  const b = Buffer.from(ADMIN_TOKEN);
-  return a.length === b.length && crypto.timingSafeEqual(a, b);
+  return safeEqual(provided, ADMIN_TOKEN);
 }
 
-module.exports = { send, sendJson, readJsonBody, adminAuthorized };
+module.exports = { send, sendJson, readJsonBody, adminAuthorized, safeEqual };

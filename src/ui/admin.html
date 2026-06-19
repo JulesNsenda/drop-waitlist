@@ -101,7 +101,11 @@
   <!-- Waitlist table -->
   <section>
     <h2>Waitlist</h2>
+    <div id="stats" style="font-size:13px;color:var(--text-muted);margin:0 0 8px"></div>
     <div class="note" id="invite-gate"></div>
+    <div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:8px">
+      <button class="btn-ghost" id="export-csv-btn">Download CSV</button>
+    </div>
     <table>
       <thead>
         <tr><th>Email</th><th>Name</th><th>Status</th><th>Joined</th><th></th></tr>

@@ -1,13 +1,31 @@
 'use strict';
 
-const { EMAIL_RE, INVITES_ENABLED, DROP_ADMIN_API_KEY, RESEND_API_KEY, EMAIL_FROM } = require('./config');
+const { EMAIL_RE, INVITES_ENABLED, DROP_ADMIN_API_KEY, RESEND_API_KEY, EMAIL_FROM, WAITLIST_JOIN_LIMIT, WAITLIST_JOIN_WINDOW_MS } = require('./config');
 const { normEmail, getEntries, findByEmail, findById, addEntry, save, getTemplates, setTemplate, resetTemplate } = require('./store');
 const { sendConfirmationEmail, sendInviteEmail, getEffectiveTemplate, DEFAULT_TEMPLATES } = require('./email');
 const { provisionAccount } = require('./drop-api');
 const { sendJson, readJsonBody } = require('./http');
+const { getClientIp, makeRateLimiter, allowEmailSend } = require('./throttle');
+const { entriesToCsv } = require('./csv');
+
+// Per-IP rate limiter for POST /api/join — created once at module load.
+const joinLimiter = makeRateLimiter(WAITLIST_JOIN_LIMIT, WAITLIST_JOIN_WINDOW_MS);
 
 async function handleJoin(req, res) {
+  // 1. Per-IP rate limit.
+  const ip = getClientIp(req);
+  if (!joinLimiter.allow(ip)) {
+    const retry = joinLimiter.retryAfter(ip);
+    res.setHeader('Retry-After', String(retry));
+    return sendJson(res, 429, { ok: false, error: 'Too many requests. Please try again later.' });
+  }
+
   const body = await readJsonBody(req);
+
+  // 2. Honeypot — filled means a bot; return 200 silently (don't teach bots the field name).
+  if (body && body.company) return sendJson(res, 200, { ok: true });
+
+  // 3. Validate email.
   if (!body || !EMAIL_RE.test(String(body.email || ''))) {
     return sendJson(res, 400, { ok: false, error: 'A valid email is required.' });
   }
@@ -21,10 +39,13 @@ async function handleJoin(req, res) {
   } else {
     addEntry({ email, name });
     await save();
-    // Fire-and-forget: email failure never blocks the signup response.
-    sendConfirmationEmail(findByEmail(email)).catch((err) =>
-      console.error('[waitlist] confirmation email error', err)
-    );
+    // 4. Gate confirmation email on the global hourly budget (protects Resend
+    //    quota under a distributed flood; signup is still stored regardless).
+    if (allowEmailSend()) {
+      sendConfirmationEmail(findByEmail(email)).catch((err) =>
+        console.error('[waitlist] confirmation email error', err)
+      );
+    }
   }
   return sendJson(res, 200, { ok: true });
 }
@@ -134,4 +155,13 @@ async function handleResetTemplate(req, res) {
   return sendJson(res, 200, { ok: true, subject: def.subject, html: def.html });
 }
 
-module.exports = { handleJoin, listEntries, handleApprove, handleGetSettings, handleSaveTemplate, handleResetTemplate };
+function handleExportCsv(res) {
+  const csv = entriesToCsv(getEntries());
+  res.writeHead(200, {
+    'Content-Type': 'text/csv; charset=utf-8',
+    'Content-Disposition': 'attachment; filename="waitlist.csv"',
+  });
+  res.end(csv);
+}
+
+module.exports = { handleJoin, listEntries, handleApprove, handleGetSettings, handleSaveTemplate, handleResetTemplate, handleExportCsv };

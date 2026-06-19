@@ -15,8 +15,9 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: document.getElementById('email').value,
-          name:  document.getElementById('name').value,
+          email:   document.getElementById('email').value,
+          name:    document.getElementById('name').value,
+          company: document.getElementById('company').value,
         }),
       });
       const data = await res.json();

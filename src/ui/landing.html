@@ -18,6 +18,11 @@
   <form id="f">
     <input id="email" type="email" placeholder="you@example.com" required autocomplete="email">
     <input id="name"  type="text"  placeholder="Name (optional)" autocomplete="name">
+    <!-- Honeypot: bots fill this; real users never see it. Styled off-screen,
+         not type=hidden, to avoid password-manager auto-fill. -->
+    <input id="company" name="company" type="text" tabindex="-1" autocomplete="off"
+           aria-hidden="true"
+           style="position:absolute;left:-9999px;opacity:0;height:0;width:0;border:0;padding:0">
     <button id="b" type="submit">Join the beta</button>
   </form>
   <div class="msg" id="m"></div>

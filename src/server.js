@@ -9,7 +9,7 @@ const { send, sendJson, adminAuthorized } = require('./http');
 const { serveStatic } = require('./static');
 const {
   handleJoin, listEntries, handleApprove,
-  handleGetSettings, handleSaveTemplate, handleResetTemplate,
+  handleGetSettings, handleSaveTemplate, handleResetTemplate, handleExportCsv,
 } = require('./routes');
 
 // Read once at startup — fails fast if a file is missing.
@@ -47,6 +47,10 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/admin/templates/reset' && req.method === 'POST') {
       if (!adminAuthorized(req)) return sendJson(res, 403, { ok: false, error: 'Forbidden' });
       return handleResetTemplate(req, res);
+    }
+    if (p === '/api/admin/export.csv' && req.method === 'GET') {
+      if (!adminAuthorized(req)) return sendJson(res, 403, { ok: false, error: 'Forbidden' });
+      return handleExportCsv(res);
     }
 
     return sendJson(res, 404, { ok: false, error: 'Not found' });
