@@ -1,0 +1,35 @@
+/* Shared design tokens and base styles used by all pages. */
+
+:root {
+  color-scheme: dark;
+
+  /* palette */
+  --bg:            #0a0a0f;
+  --surface:       #111118;
+  --border:        #1f2937;
+  --border-subtle: #1a1a22;
+  --text:          #e5e7eb;
+  --text-muted:    #6b7280;
+  --text-dim:      #374151;
+  --brand:         #4f46e5;
+  --brand-hover:   #6366f1;
+  --green:         #34d399;
+  --red:           #f87171;
+  --yellow:        #f59e0b;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* Shared status colours */
+.ok   { color: var(--green); }
+.err  { color: var(--red); }
+.warn { color: var(--yellow); }

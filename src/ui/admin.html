@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DROP waitlist — admin</title>
+  <link rel="stylesheet" href="/ui/shared.css">
+  <link rel="stylesheet" href="/ui/admin.css">
+</head>
+<body>
+
+<!-- ── top bar ──────────────────────────────────────────────────────────────── -->
+<div class="bar">
+  <h1>Waitlist admin</h1>
+  <input id="tok" type="password" placeholder="Admin token" style="flex:1;min-width:200px">
+  <button id="load-btn">Load</button>
+  <span class="bar-msg" id="bar-msg"></span>
+</div>
+
+<!-- ── placeholder (shown before first load) ───────────────────────────────── -->
+<div id="placeholder" class="section-placeholder">
+  Enter your admin token above and click Load to manage settings.
+</div>
+
+<!-- ── content (revealed after successful load) ────────────────────────────── -->
+<div id="content" style="display:none">
+
+  <!-- Email config status -->
+  <section>
+    <h2>Email config</h2>
+    <div class="config-grid" id="config-grid"></div>
+  </section>
+
+  <!-- Confirmation email template -->
+  <section>
+    <h2>Confirmation email template</h2>
+    <p style="font-size:13px;color:var(--text-muted);margin:0 0 12px">
+      Sent automatically when someone joins the waitlist.
+    </p>
+    <div class="template-card" id="card-confirmation">
+      <div class="template-meta" id="meta-confirmation"></div>
+      <div class="field">
+        <label>Subject</label>
+        <div class="field-row">
+          <input type="text" class="subj-input" id="subj-confirmation" maxlength="200">
+          <span class="char-count" id="subj-count-confirmation">0/200</span>
+        </div>
+      </div>
+      <div class="field">
+        <label>Body (HTML)</label>
+        <textarea id="html-confirmation"></textarea>
+        <p class="field-note">HTML is sent as-is. Inline CSS only — most email clients strip &lt;style&gt; blocks.</p>
+      </div>
+      <div class="vars">
+        Available variables: <code>{{name}}</code> <code>{{email}}</code>
+      </div>
+      <div class="template-actions">
+        <button id="save-confirmation">Save</button>
+        <button class="btn-ghost btn-danger" id="reset-confirmation">Reset to default…</button>
+        <span class="save-msg" id="msg-confirmation"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Invite email template -->
+  <section>
+    <h2>Invite email template</h2>
+    <p style="font-size:13px;color:var(--text-muted);margin:0 0 12px">
+      Sent when you approve someone from the waitlist.
+    </p>
+    <div id="invite-disabled-note" class="note" style="display:none">
+      Invite emails are disabled — set WAITLIST_INVITES_ENABLED=true to activate.
+    </div>
+    <div class="template-card" id="card-invite">
+      <div class="template-meta" id="meta-invite"></div>
+      <div class="field">
+        <label>Subject</label>
+        <div class="field-row">
+          <input type="text" class="subj-input" id="subj-invite" maxlength="200">
+          <span class="char-count" id="subj-count-invite">0/200</span>
+        </div>
+      </div>
+      <div class="field">
+        <label>Body (HTML)</label>
+        <textarea id="html-invite"></textarea>
+        <p class="field-note">HTML is sent as-is. Inline CSS only — most email clients strip &lt;style&gt; blocks.</p>
+      </div>
+      <div class="vars">
+        Available variables:
+        <code>{{name}}</code> <code>{{email}}</code>
+        <code>{{username}}</code> <code>{{tempPassword}}</code> <code>{{dashboardUrl}}</code>
+      </div>
+      <div class="template-actions">
+        <button id="save-invite">Save</button>
+        <button class="btn-ghost btn-danger" id="reset-invite">Reset to default…</button>
+        <span class="save-msg" id="msg-invite"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Waitlist table -->
+  <section>
+    <h2>Waitlist</h2>
+    <div class="note" id="invite-gate"></div>
+    <table>
+      <thead>
+        <tr><th>Email</th><th>Name</th><th>Status</th><th>Joined</th><th></th></tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </section>
+
+</div><!-- /content -->
+
+<script src="/ui/admin.js"></script>
+</body>
+</html>

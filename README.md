@@ -20,10 +20,9 @@ scp -r ./waitlist-app drop@<server>:/var/drop/data/webapps/dropkit   # name = su
 # → served at https://dropkit.<your-domain> within seconds
 ```
 
-To make it the **apex** site (`dropkit.sh`) with the dashboard on a subdomain,
-point the apex Caddy route at this app instead of the dashboard (see
-`docs/HETZNER-DEPLOY.md` → the apex host file) and move the dashboard route to
-e.g. `app.dropkit.sh`.
+To make it the **apex** site (e.g. `dropkit.sh`) with the dashboard on a
+subdomain, point the apex Caddy route at this app instead of the dashboard and
+move the dashboard route to e.g. `app.dropkit.sh`.
 
 ## Configuration (set as DROP per-app secrets — injected as env)
 
@@ -56,3 +55,22 @@ Until then, leave invites off — you can still collect signups and approve
 - `GET /api/admin/entries` — token-gated list
 - `POST /api/admin/approve` `{id}` — token-gated approve/invite
 - `GET /health` — `{ok:true}`
+
+## Project layout
+
+```
+server.js          # entry point (thin shim → src/server.js)
+src/
+  config.js        # env-derived config
+  store.js         # persistence + waitlist entry API
+  email.js         # Resend send + welcome email template
+  drop-api.js      # DROP account provisioning
+  http.js          # request/response helpers
+  views.js         # loads HTML pages from src/ui/ at startup
+  ui/
+    landing.html   # public join page
+    admin.html     # token-gated admin UI
+  routes.js        # request handlers
+  server.js        # HTTP server + boot
+.env.example       # env contract reference
+```

@@ -3,6 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "description": "Beta waitlist for DROP — deployed on DROP itself. Zero dependencies.",
+  "license": "UNLICENSED",
+  "keywords": ["waitlist", "drop", "paas", "self-hosted"],
   "main": "server.js",
   "scripts": {
     "start": "node server.js"

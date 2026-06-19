@@ -1,0 +1,111 @@
+/* Landing page styles */
+
+body {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 24px;
+}
+
+/* Ambient glow behind the card */
+.glow {
+  position: fixed;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 600px; height: 600px;
+  background: rgba(79, 70, 229, .06);
+  border-radius: 50%;
+  filter: blur(80px);
+  pointer-events: none;
+}
+
+.wrap {
+  position: relative;
+  z-index: 1;
+  max-width: 460px;
+  width: 100%;
+}
+
+.logo {
+  width: 48px; height: 48px;
+  background: var(--brand);
+  border-radius: 12px;
+  margin: 0 auto 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+}
+
+.kicker {
+  color: var(--text-muted);
+  font-size: 13px;
+  letter-spacing: .3em;
+  text-transform: uppercase;
+  margin: 0 0 16px;
+}
+
+h1 {
+  font-size: 44px;
+  line-height: 1.05;
+  margin: 0 0 16px;
+  font-weight: 800;
+  letter-spacing: -.02em;
+}
+
+h1 span { color: var(--brand-hover); }
+
+.sub {
+  color: var(--text-muted);
+  font-size: 14px;
+  margin: 0 0 32px;
+}
+
+form {
+  display: flex;
+  gap: 8px;
+  flex-direction: column;
+}
+
+input {
+  padding: 12px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: #fff;
+  font-size: 15px;
+  outline: none;
+}
+
+input:focus { border-color: var(--brand); }
+
+button {
+  padding: 12px 16px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--brand);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button:hover   { background: var(--brand-hover); }
+button:disabled { opacity: .5; cursor: default; }
+
+.msg {
+  margin-top: 16px;
+  font-size: 14px;
+  min-height: 20px;
+}
+
+.foot {
+  position: fixed;
+  bottom: 24px; left: 0; right: 0;
+  color: var(--text-dim);
+  font-size: 11px;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+}

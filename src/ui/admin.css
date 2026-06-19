@@ -1,0 +1,154 @@
+/* Admin page styles */
+
+body {
+  padding: 24px;
+  max-width: 860px;
+}
+
+/* ── headings ──────────────────────────────────────────────────────────────── */
+
+h1 { font-size: 20px; margin: 0 16px 0 0; }
+
+h2 { font-size: 15px; font-weight: 600; margin: 0 0 12px; color: #c4c4d4; }
+
+/* ── form controls ─────────────────────────────────────────────────────────── */
+
+input, textarea {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: #fff;
+  outline: none;
+  font-family: inherit;
+  font-size: 14px;
+}
+
+input:focus, textarea:focus { border-color: var(--brand); }
+
+textarea {
+  resize: vertical;
+  width: 100%;
+  min-height: 120px;
+}
+
+/* ── buttons ───────────────────────────────────────────────────────────────── */
+
+button {
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--brand);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+button:hover    { background: var(--brand-hover); }
+button:disabled { opacity: .5; cursor: default; }
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+.btn-ghost:hover {
+  color: var(--text);
+  background: var(--surface);
+  border-color: var(--text-dim);
+}
+.btn-danger { color: var(--red); border-color: #7f1d1d; }
+.btn-danger:hover { background: #1c0a0a; border-color: var(--red); }
+
+/* ── top bar ───────────────────────────────────────────────────────────────── */
+
+.bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.bar-msg { font-size: 13px; color: var(--text-muted); }
+
+/* ── sections ──────────────────────────────────────────────────────────────── */
+
+section { margin-bottom: 32px; }
+
+.section-placeholder { color: #4b5563; font-size: 14px; padding: 16px 0; }
+
+/* ── email config status ────────────────────────────────────────────────────── */
+
+.config-grid {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 16px;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.config-label { color: var(--text-muted); }
+
+/* ── template editor ────────────────────────────────────────────────────────── */
+
+.template-card {
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.template-card.dimmed { opacity: .4; pointer-events: none; }
+
+.template-meta { font-size: 11px; color: var(--text-muted); margin-bottom: 12px; }
+
+.field { margin-bottom: 12px; }
+
+.field label {
+  display: block;
+  font-size: 12px;
+  color: #9ca3af;
+  margin-bottom: 4px;
+}
+
+.field-row { display: flex; align-items: center; gap: 8px; }
+
+.subj-input { flex: 1; }
+
+.char-count { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+
+.field-note { font-size: 11px; color: var(--text-muted); margin: 4px 0 0; }
+
+.vars { font-size: 11px; color: var(--text-muted); margin-bottom: 12px; }
+
+.vars code {
+  background: var(--surface);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 11px;
+  color: #a5b4fc;
+}
+
+.template-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+.save-msg { font-size: 12px; }
+.save-msg.ok-msg  { color: var(--green); }
+.save-msg.err-msg { color: var(--red); }
+
+/* ── waitlist table ─────────────────────────────────────────────────────────── */
+
+.note { color: var(--yellow); font-size: 12px; margin-bottom: 12px; }
+
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+
+th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border-subtle); }
+
+th { color: var(--text-muted); font-weight: 500; font-size: 12px; }
+
+/* status pills */
+.pill { font-size: 11px; padding: 2px 8px; border-radius: 999px; }
+.pending  { background: var(--border); color: #9ca3af; }
+.approved { background: #3730a3; color: #c7d2fe; }
+.invited  { background: #064e3b; color: #6ee7b7; }
