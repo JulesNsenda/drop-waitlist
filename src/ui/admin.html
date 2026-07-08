@@ -9,112 +9,223 @@
 </head>
 <body>
 
-<!-- ── top bar ──────────────────────────────────────────────────────────────── -->
-<div class="bar">
-  <h1>Waitlist admin</h1>
-  <input id="tok" type="password" placeholder="Admin token" style="flex:1;min-width:200px">
-  <button id="load-btn">Load</button>
-  <span class="bar-msg" id="bar-msg"></span>
+<!-- ── login gate ───────────────────────────────────────────────────────────── -->
+<div id="gate" class="gate">
+  <div class="gate-card">
+    <div class="logo-mark">◧</div>
+    <p class="kicker">DROP admin</p>
+    <h1>Waitlist admin</h1>
+    <form id="gate-form" novalidate>
+      <input id="gate-tok" type="password" placeholder="Admin token"
+             autocomplete="current-password" autofocus required>
+      <button id="gate-submit" type="submit">Enter</button>
+    </form>
+    <p class="gate-msg err" id="gate-msg" aria-live="polite"></p>
+  </div>
 </div>
 
-<!-- ── placeholder (shown before first load) ───────────────────────────────── -->
-<div id="placeholder" class="section-placeholder">
-  Enter your admin token above and click Load to manage settings.
-</div>
+<!-- ── app shell ────────────────────────────────────────────────────────────── -->
+<div id="shell" class="shell" style="display:none">
 
-<!-- ── content (revealed after successful load) ────────────────────────────── -->
-<div id="content" style="display:none">
+  <nav class="sidebar">
+    <div class="brand">
+      <span class="logo-mark">◧</span>
+      <span class="wordmark">DROP</span>
+    </div>
+    <p class="kicker">Admin</p>
+    <a href="#/waitlist" class="nav-item" data-route="waitlist">
+      Waitlist <span class="badge" id="nav-pending-badge" hidden></span>
+    </a>
+    <a href="#/emails" class="nav-item" data-route="emails">Emails</a>
+    <a href="#/system" class="nav-item" data-route="system">System</a>
+    <button id="logout-btn" class="nav-item nav-logout" type="button">Logout</button>
+  </nav>
 
-  <!-- Email config status -->
-  <section>
-    <h2>Email config</h2>
-    <div class="config-grid" id="config-grid"></div>
-  </section>
+  <main class="main">
 
-  <!-- Confirmation email template -->
-  <section>
-    <h2>Confirmation email template</h2>
-    <p style="font-size:13px;color:var(--text-muted);margin:0 0 12px">
-      Sent automatically when someone joins the waitlist.
-    </p>
-    <div class="template-card" id="card-confirmation">
-      <div class="template-meta" id="meta-confirmation"></div>
-      <div class="field">
-        <label>Subject</label>
-        <div class="field-row">
-          <input type="text" class="subj-input" id="subj-confirmation" maxlength="200">
-          <span class="char-count" id="subj-count-confirmation">0/200</span>
+    <!-- ── Waitlist view ────────────────────────────────────────────────────── -->
+    <section id="view-waitlist" class="view" hidden>
+      <div class="view-head">
+        <h1>Waitlist</h1>
+        <span class="updated-note" id="waitlist-updated"></span>
+      </div>
+
+      <div class="stat-row">
+        <button type="button" class="stat-card" id="stat-total" data-filter="all">
+          <span class="stat-num" id="stat-total-num">0</span>
+          <span class="stat-label">Total</span>
+        </button>
+        <button type="button" class="stat-card" id="stat-pending" data-filter="pending">
+          <span class="stat-num" id="stat-pending-num">0</span>
+          <span class="stat-label">Pending</span>
+        </button>
+        <button type="button" class="stat-card" id="stat-approved" data-filter="approved">
+          <span class="stat-num" id="stat-approved-num">0</span>
+          <span class="stat-label">Approved</span>
+        </button>
+        <button type="button" class="stat-card" id="stat-invited" data-filter="invited">
+          <span class="stat-num" id="stat-invited-num">0</span>
+          <span class="stat-label">Invited</span>
+        </button>
+        <div class="stat-card stat-card-static" id="stat-recent">
+          <span class="stat-num" id="stat-recent-num">0</span>
+          <span class="stat-label">Last 7 days</span>
         </div>
       </div>
-      <div class="field">
-        <label>Body (HTML)</label>
-        <textarea id="html-confirmation"></textarea>
-        <p class="field-note">HTML is sent as-is. Inline CSS only — most email clients strip &lt;style&gt; blocks.</p>
-      </div>
-      <div class="vars">
-        Available variables: <code>{{name}}</code> <code>{{email}}</code>
-      </div>
-      <div class="template-actions">
-        <button id="save-confirmation">Save</button>
-        <button class="btn-ghost btn-danger" id="reset-confirmation">Reset to default…</button>
-        <span class="save-msg" id="msg-confirmation"></span>
-      </div>
-    </div>
-  </section>
 
-  <!-- Invite email template -->
-  <section>
-    <h2>Invite email template</h2>
-    <p style="font-size:13px;color:var(--text-muted);margin:0 0 12px">
-      Sent when you approve someone from the waitlist.
-    </p>
-    <div id="invite-disabled-note" class="note" style="display:none">
-      Invite emails are disabled — set WAITLIST_INVITES_ENABLED=true to activate.
-    </div>
-    <div class="template-card" id="card-invite">
-      <div class="template-meta" id="meta-invite"></div>
-      <div class="field">
-        <label>Subject</label>
-        <div class="field-row">
-          <input type="text" class="subj-input" id="subj-invite" maxlength="200">
-          <span class="char-count" id="subj-count-invite">0/200</span>
+      <div class="note" id="invites-banner" hidden>
+        Invites are disabled — approving only marks entries; no accounts are created
+        until WAITLIST_INVITES_ENABLED=true once Docker isolation is on.
+      </div>
+
+      <div class="toolbar">
+        <input type="search" id="search-input" placeholder="Search email or name…">
+        <button class="btn-ghost" id="export-csv-btn">Export all (CSV)</button>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Email</th><th>Name</th><th>Status</th><th>Joined</th><th></th></tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <p class="empty-state" id="empty-state" hidden></p>
+    </section>
+
+    <!-- ── Emails view ──────────────────────────────────────────────────────── -->
+    <section id="view-emails" class="view" hidden>
+      <div class="view-head"><h1>Emails</h1></div>
+
+      <div class="note" id="resend-banner" hidden>
+        Resend is not configured — emails cannot be sent. Set RESEND_API_KEY in the
+        server environment to enable outgoing email.
+      </div>
+
+      <!-- Confirmation email -->
+      <div class="editor-card">
+        <div class="editor-head">
+          <h2>Confirmation email</h2>
+          <p class="editor-sub">Sent automatically when someone joins the waitlist.</p>
+        </div>
+        <div class="editor-meta" id="meta-confirmation"></div>
+        <div class="field">
+          <label for="subj-confirmation">Subject</label>
+          <div class="field-row">
+            <input type="text" class="subj-input" id="subj-confirmation" maxlength="200">
+            <span class="char-count" id="subj-count-confirmation">0/200</span>
+          </div>
+        </div>
+        <div class="editor-grid">
+          <div class="field">
+            <label for="html-confirmation">Body (HTML)</label>
+            <textarea id="html-confirmation" spellcheck="false"></textarea>
+            <div class="chips" data-target="html-confirmation">
+              <button type="button" class="chip" data-var="{{name}}">{{name}}</button>
+              <button type="button" class="chip" data-var="{{email}}">{{email}}</button>
+            </div>
+            <p class="field-note">HTML is sent as-is. Inline CSS only — most email clients strip &lt;style&gt; blocks.</p>
+          </div>
+          <div class="field">
+            <label>Preview</label>
+            <iframe class="preview-frame" id="preview-confirmation" sandbox title="Confirmation email preview"></iframe>
+          </div>
+        </div>
+        <div class="editor-actions">
+          <button id="save-confirmation">Save</button>
+          <button class="btn-ghost btn-danger" id="reset-confirmation">Reset to default…</button>
+          <span class="save-msg" id="msg-confirmation" aria-live="polite"></span>
         </div>
       </div>
-      <div class="field">
-        <label>Body (HTML)</label>
-        <textarea id="html-invite"></textarea>
-        <p class="field-note">HTML is sent as-is. Inline CSS only — most email clients strip &lt;style&gt; blocks.</p>
+
+      <!-- Invite email -->
+      <div class="editor-card">
+        <div class="editor-head">
+          <h2>Invite email</h2>
+          <p class="editor-sub">Sent when you approve someone from the waitlist.</p>
+        </div>
+        <div class="note" id="invite-editor-banner" hidden>
+          Invite sending is disabled — set WAITLIST_INVITES_ENABLED=true once Docker
+          isolation is on. You can still edit and save this template.
+        </div>
+        <div class="editor-meta" id="meta-invite"></div>
+        <div class="field">
+          <label for="subj-invite">Subject</label>
+          <div class="field-row">
+            <input type="text" class="subj-input" id="subj-invite" maxlength="200">
+            <span class="char-count" id="subj-count-invite">0/200</span>
+          </div>
+        </div>
+        <div class="editor-grid">
+          <div class="field">
+            <label for="html-invite">Body (HTML)</label>
+            <textarea id="html-invite" spellcheck="false"></textarea>
+            <div class="chips" data-target="html-invite">
+              <button type="button" class="chip" data-var="{{name}}">{{name}}</button>
+              <button type="button" class="chip" data-var="{{email}}">{{email}}</button>
+              <button type="button" class="chip" data-var="{{username}}">{{username}}</button>
+              <button type="button" class="chip" data-var="{{tempPassword}}">{{tempPassword}}</button>
+              <button type="button" class="chip" data-var="{{dashboardUrl}}">{{dashboardUrl}}</button>
+            </div>
+            <p class="field-note">HTML is sent as-is. Inline CSS only — most email clients strip &lt;style&gt; blocks.</p>
+          </div>
+          <div class="field">
+            <label>Preview</label>
+            <iframe class="preview-frame" id="preview-invite" sandbox title="Invite email preview"></iframe>
+          </div>
+        </div>
+        <div class="editor-actions">
+          <button id="save-invite">Save</button>
+          <button class="btn-ghost btn-danger" id="reset-invite">Reset to default…</button>
+          <span class="save-msg" id="msg-invite" aria-live="polite"></span>
+        </div>
       </div>
-      <div class="vars">
-        Available variables:
-        <code>{{name}}</code> <code>{{email}}</code>
-        <code>{{username}}</code> <code>{{tempPassword}}</code> <code>{{dashboardUrl}}</code>
-      </div>
-      <div class="template-actions">
-        <button id="save-invite">Save</button>
-        <button class="btn-ghost btn-danger" id="reset-invite">Reset to default…</button>
-        <span class="save-msg" id="msg-invite"></span>
+    </section>
+
+    <!-- ── System view ──────────────────────────────────────────────────────── -->
+    <section id="view-system" class="view" hidden>
+      <div class="view-head"><h1>System</h1></div>
+      <div class="system-grid" id="system-grid"></div>
+    </section>
+
+  </main>
+</div><!-- /shell -->
+
+<!-- ── toast (approve outcomes) ─────────────────────────────────────────────── -->
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+<!-- ── confirm dialog — dismissable (Esc / backdrop / Cancel) ───────────────── -->
+<dialog id="confirm-dialog" class="dialog">
+  <p id="confirm-dialog-msg"></p>
+  <div class="dialog-actions">
+    <button class="btn-ghost" id="confirm-dialog-cancel" type="button">Cancel</button>
+    <button id="confirm-dialog-ok" type="button">Confirm</button>
+  </div>
+</dialog>
+
+<!-- ── credentials dialog — NOT dismissable except via explicit button ──────── -->
+<dialog id="creds-dialog" class="dialog">
+  <h2>Account created</h2>
+  <div class="creds-body">
+    <div class="field">
+      <label>Username</label>
+      <div class="creds-value" id="creds-username"></div>
+    </div>
+    <div class="field">
+      <label>Temporary password</label>
+      <div class="creds-value-row">
+        <div class="creds-value mono" id="creds-password"></div>
+        <button class="btn-ghost" id="creds-copy-btn" type="button">Copy</button>
       </div>
     </div>
-  </section>
-
-  <!-- Waitlist table -->
-  <section>
-    <h2>Waitlist</h2>
-    <div id="stats" style="font-size:13px;color:var(--text-muted);margin:0 0 8px"></div>
-    <div class="note" id="invite-gate"></div>
-    <div style="display:flex;align-items:center;justify-content:flex-end;margin-bottom:8px">
-      <button class="btn-ghost" id="export-csv-btn">Download CSV</button>
-    </div>
-    <table>
-      <thead>
-        <tr><th>Email</th><th>Name</th><th>Status</th><th>Joined</th><th></th></tr>
-      </thead>
-      <tbody id="rows"></tbody>
-    </table>
-  </section>
-
-</div><!-- /content -->
+    <p class="note" id="creds-email-error" hidden></p>
+    <p class="creds-warning">This password is shown once and cannot be retrieved again. Save it somewhere safe.</p>
+  </div>
+  <div class="dialog-actions">
+    <button id="creds-close-btn" type="button">I've saved this password</button>
+  </div>
+</dialog>
 
 <script src="/ui/admin.js"></script>
 </body>
