@@ -3,13 +3,15 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const { PORT, STORE_PATH, INVITES_ENABLED } = require('./config');
+const { PORT, STORE_PATH } = require('./config');
 const { loadStore } = require('./store');
 const { send, sendJson, adminAuthorized } = require('./http');
 const { serveStatic } = require('./static');
+const { isInvitesEnabled } = require('./settings');
 const {
   handleJoin, listEntries, handleApprove,
-  handleGetSettings, handleSaveTemplate, handleResetTemplate, handleExportCsv,
+  handleGetSettings, handleSaveSettings, handleResetSettings, handleTestEmail,
+  handleSaveTemplate, handleResetTemplate, handleExportCsv,
 } = require('./routes');
 
 // Read once at startup — fails fast if a file is missing.
@@ -40,6 +42,18 @@ const server = http.createServer(async (req, res) => {
       if (!adminAuthorized(req)) return sendJson(res, 403, { ok: false, error: 'Forbidden' });
       return handleGetSettings(res);
     }
+    if (p === '/api/admin/settings' && req.method === 'POST') {
+      if (!adminAuthorized(req)) return sendJson(res, 403, { ok: false, error: 'Forbidden' });
+      return handleSaveSettings(req, res);
+    }
+    if (p === '/api/admin/settings/reset' && req.method === 'POST') {
+      if (!adminAuthorized(req)) return sendJson(res, 403, { ok: false, error: 'Forbidden' });
+      return handleResetSettings(req, res);
+    }
+    if (p === '/api/admin/test-email' && req.method === 'POST') {
+      if (!adminAuthorized(req)) return sendJson(res, 403, { ok: false, error: 'Forbidden' });
+      return handleTestEmail(req, res);
+    }
     if (p === '/api/admin/templates' && req.method === 'POST') {
       if (!adminAuthorized(req)) return sendJson(res, 403, { ok: false, error: 'Forbidden' });
       return handleSaveTemplate(req, res);
@@ -62,6 +76,6 @@ const server = http.createServer(async (req, res) => {
 
 loadStore().then(() => {
   server.listen(PORT, () => {
-    console.log(`[waitlist] listening on :${PORT}  (data: ${STORE_PATH}, invites: ${INVITES_ENABLED ? 'on' : 'off'})`);
+    console.log(`[waitlist] listening on :${PORT}  (data: ${STORE_PATH}, invites: ${isInvitesEnabled() ? 'on' : 'off'})`);
   });
 });

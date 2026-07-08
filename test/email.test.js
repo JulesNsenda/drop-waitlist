@@ -1,8 +1,22 @@
 'use strict';
 
+const os = require('os');
+const path = require('path');
+const fs = require('fs');
+
+// Force a deterministic env BEFORE any src module is required: point
+// DROP_DATA_DIR at a throwaway temp dir (never the real project data/ dir —
+// nothing below calls loadStore()/save(), but this stays defensive) and
+// clear any ambient RESEND_API_KEY so the default effective provider
+// resolves to 'none', as asserted below.
+process.env.DROP_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'drop-waitlist-email-test-'));
+delete process.env.RESEND_API_KEY;
+delete process.env.EMAIL_FROM;
+
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { escapeHtml, renderTemplate, htmlToText } = require('../src/email');
+const { escapeHtml, renderTemplate, htmlToText, sendEmail, stripCrlf } = require('../src/email');
+const { getEffectiveEmailSettings } = require('../src/settings');
 
 // ── escapeHtml ─────────────────────────────────────────────────────────────────
 
@@ -101,4 +115,29 @@ test('htmlToText: invite template preserves dashboard URL', () => {
   const html = `<p><a href="https://app.example.com/dashboard" style="color:blue">Open the dashboard</a></p>`;
   const out = htmlToText(html);
   assert.ok(out.includes('https://app.example.com/dashboard'), `got: ${out}`);
+});
+
+// ── sendEmail: provider routing ─────────────────────────────────────────────────
+
+test('sendEmail: provider none returns {sent:false, error:"email disabled"} — no network', async () => {
+  const result = await sendEmail({ to: 'a@b.com', subject: 'Hi', html: '<p>hi</p>' });
+  assert.deepEqual(result, { sent: false, error: 'email disabled' });
+});
+
+test('getEffectiveEmailSettings: from resolves to the EMAIL_FROM env default when nothing is saved', () => {
+  const eff = getEffectiveEmailSettings();
+  assert.equal(eff.provider, 'none');
+  assert.equal(eff.from, 'DROP <onboarding@resend.dev>');
+});
+
+// ── stripCrlf (send-path last-line CRLF/header-injection defense) ───────────────
+
+test('stripCrlf: strips \\r and \\n, leaving normal text untouched', () => {
+  assert.equal(stripCrlf('Hello\r\nBcc: evil@attacker.example'), 'HelloBcc: evil@attacker.example');
+  assert.equal(stripCrlf('Perfectly normal subject'), 'Perfectly normal subject');
+});
+
+test('stripCrlf: null/undefined coerce to empty string', () => {
+  assert.equal(stripCrlf(null), '');
+  assert.equal(stripCrlf(undefined), '');
 });

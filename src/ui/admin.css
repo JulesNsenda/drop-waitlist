@@ -12,7 +12,7 @@
 h1 { font-size: 22px; font-weight: 800; letter-spacing: -.02em; margin: 0; }
 h2 { font-size: 15px; font-weight: 600; margin: 0; color: #c4c4d4; }
 
-input, textarea {
+input, textarea, select {
   padding: 12px 16px;
   border-radius: 10px;
   border: 1px solid var(--border);
@@ -22,7 +22,7 @@ input, textarea {
   font-size: 14px;
 }
 
-input:focus, textarea:focus { border-color: var(--brand); }
+input:focus, textarea:focus, select:focus { border-color: var(--brand); }
 
 textarea {
   resize: vertical;
@@ -324,18 +324,61 @@ td button { padding: 6px 12px; font-size: 12px; }
 .save-msg.ok-msg  { color: var(--green); }
 .save-msg.err-msg { color: var(--red); }
 
-/* ── system view ───────────────────────────────────────────────────────────── */
+/* ── settings view ─────────────────────────────────────────────────────────── */
 
-.system-grid {
+/* Direct children only — field-row inputs (test email) keep flex sizing. */
+#view-settings .field > input  { width: 100%; }
+#view-settings .field > select { width: 100%; max-width: 320px; }
+
+.field-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 16px;
+}
+
+.static-value { font-size: 14px; }
+
+.test-email-row {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-subtle);
+}
+.test-email-row .field-row input { flex: 1; max-width: 320px; padding: 9px 14px; }
+
+.test-email-result { font-size: 12px; margin: 6px 0 0; min-height: 16px; }
+
+.switch-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14px;
+  cursor: pointer;
+  max-width: 640px;
+}
+.switch-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  margin: 1px 0 0;
+  border-radius: 4px;
+  accent-color: var(--brand);
+  flex: none;
+  cursor: pointer;
+}
+.switch-text { line-height: 1.45; }
+
+/* environment card rows (read-only) */
+.env-grid {
   display: grid;
   grid-template-columns: max-content max-content 1fr;
   gap: 14px 24px;
   font-size: 14px;
   align-items: baseline;
+  margin-top: 14px;
 }
 
-.system-label { color: var(--text-muted); font-size: 13px; }
-.system-hint  { color: var(--text-muted); font-size: 13px; }
+.env-label { color: var(--text-muted); font-size: 13px; }
+.env-hint  { color: var(--text-muted); font-size: 13px; }
 
 /* ── toast ─────────────────────────────────────────────────────────────────── */
 
@@ -425,8 +468,10 @@ td button { padding: 6px 12px; font-size: 12px; }
   .editor-grid { grid-template-columns: 1fr; }
   .preview-frame { height: 220px; }
 
-  .system-grid { grid-template-columns: 1fr; gap: 4px; }
-  .system-label { margin-top: 12px; }
+  .field-grid { grid-template-columns: 1fr; }
+
+  .env-grid { grid-template-columns: 1fr; gap: 4px; }
+  .env-label { margin-top: 12px; }
 
   .toolbar { flex-wrap: wrap; }
   .toolbar input { max-width: none; }

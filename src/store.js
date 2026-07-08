@@ -5,7 +5,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { DATA_DIR, STORE_PATH } = require('./config');
 
-let store = { entries: [], templates: {} };
+let store = { entries: [], templates: {}, settings: {} };
 let writeChain = Promise.resolve();
 
 async function loadStore() {
@@ -17,9 +17,12 @@ async function loadStore() {
       store.templates = (store.templates && typeof store.templates === 'object' && !Array.isArray(store.templates))
         ? store.templates
         : {};
+      store.settings = (store.settings && typeof store.settings === 'object' && !Array.isArray(store.settings))
+        ? store.settings
+        : {};
     }
   } catch {
-    store = { entries: [], templates: {} };
+    store = { entries: [], templates: {}, settings: {} };
   }
 }
 
@@ -27,8 +30,11 @@ function save() {
   writeChain = writeChain.then(async () => {
     await fsp.mkdir(DATA_DIR, { recursive: true });
     const tmp = path.join(DATA_DIR, `.waitlist.${process.pid}.tmp`);
-    await fsp.writeFile(tmp, JSON.stringify(store, null, 2));
+    await fsp.writeFile(tmp, JSON.stringify(store, null, 2), { mode: 0o600 });
     await fsp.rename(tmp, STORE_PATH);
+    // No-op on Windows dev (chmod only toggles the read-only attribute there);
+    // real 0600 enforcement on the Linux deploy. Never let this reject the save.
+    await fsp.chmod(STORE_PATH, 0o600).catch(() => {});
   }, () => {});
   return writeChain;
 }
@@ -75,8 +81,33 @@ function resetTemplate(type) {
   return save();
 }
 
+function getSettings() {
+  return store.settings;
+}
+
+// `key` is 'email' or 'invitesEnabled'. `value` is the already-validated
+// shape (settings.js owns validation) — email is stored as-is plus savedAt;
+// invitesEnabled is wrapped in {value, savedAt} to carry its own save time.
+function setSettingsSection(key, value) {
+  if (key === 'email') {
+    store.settings.email = { ...value, savedAt: new Date().toISOString() };
+  } else if (key === 'invitesEnabled') {
+    store.settings.invitesEnabled = { value: !!value, savedAt: new Date().toISOString() };
+  } else {
+    throw new Error('invalid settings key');
+  }
+  return save();
+}
+
+function resetSettingsSection(key) {
+  if (!['email', 'invitesEnabled'].includes(key)) throw new Error('invalid settings key');
+  delete store.settings[key];
+  return save();
+}
+
 module.exports = {
   loadStore, save, normEmail,
   getEntries, findByEmail, findById, addEntry,
   getTemplates, setTemplate, resetTemplate,
+  getSettings, setSettingsSection, resetSettingsSection,
 };

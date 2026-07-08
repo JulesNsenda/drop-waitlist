@@ -1,7 +1,9 @@
 'use strict';
 
-const { RESEND_API_KEY, EMAIL_FROM, DASHBOARD_URL } = require('./config');
+const { RESEND_API_KEY, DASHBOARD_URL } = require('./config');
 const { getTemplates } = require('./store');
+const { getEffectiveEmailSettings } = require('./settings');
+const { smtpSend } = require('./smtp');
 
 // ── default templates ─────────────────────────────────────────────────────────
 const DEFAULT_TEMPLATES = {
@@ -84,9 +86,40 @@ function htmlToText(html) {
 // ── send helpers ──────────────────────────────────────────────────────────────
 
 let _inFlight = 0;
-const MAX_IN_FLIGHT = 10;
+const MAX_IN_FLIGHT = 10; // Resend path only — the SMTP path serializes internally.
 
+// Last-line-of-defense header-injection guard on the send path itself
+// (settings.js already rejects CRLF at the settings POST; this catches
+// anything reaching sendEmail some other way, e.g. template subjects).
+function stripCrlf(value) {
+  return String(value == null ? '' : value).replace(/[\r\n]/g, '');
+}
+
+// Routes by the effective provider: 'none' sends nothing, 'smtp' hands off to
+// the zero-dep client, 'resend' keeps the existing HTTP API path.
 async function sendEmail({ to, subject, html }) {
+  const effective = getEffectiveEmailSettings();
+  const cleanSubject = stripCrlf(subject);
+  const cleanFrom = stripCrlf(effective.from);
+
+  if (effective.provider === 'none') {
+    return { sent: false, error: 'email disabled' };
+  }
+
+  if (effective.provider === 'smtp') {
+    const text = htmlToText(html);
+    return smtpSend(
+      {
+        host: effective.smtp.host,
+        port: effective.smtp.port,
+        username: effective.smtp.username,
+        password: effective.smtp.password,
+      },
+      { from: cleanFrom, to, subject: cleanSubject, html, text }
+    );
+  }
+
+  // provider === 'resend'
   if (!RESEND_API_KEY) return { sent: false, error: 'email not configured (RESEND_API_KEY unset)' };
   if (_inFlight >= MAX_IN_FLIGHT) return { sent: false, error: 'too many concurrent sends' };
   const text = htmlToText(html);
@@ -95,7 +128,7 @@ async function sendEmail({ to, subject, html }) {
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from: EMAIL_FROM, to: [to], subject, html, text }),
+      body: JSON.stringify({ from: cleanFrom, to: [to], subject: cleanSubject, html, text }),
     });
     if (!res.ok) {
       const detail = await res.text().catch(() => '');
@@ -143,4 +176,5 @@ module.exports = {
   DEFAULT_TEMPLATES,
   escapeHtml,
   htmlToText,
+  stripCrlf,
 };

@@ -1,7 +1,7 @@
 'use strict';
 
 (function () {
-  const ROUTES = ['waitlist', 'emails', 'system'];
+  const ROUTES = ['waitlist', 'emails', 'settings'];
   const TOKEN_KEY = 'drop-admin-tok';
 
   // A private sentinel thrown by api() on 403 — every caller treats it as
@@ -21,7 +21,7 @@
   const state = {
     token: '',
     loggedIn: false,
-    settings: null,
+    settings: null, // full GET /api/admin/settings body: templates, email, invites, env flags
     entries: [],
     invitesEnabled: false,
     currentRoute: 'waitlist',
@@ -30,7 +30,7 @@
     lastUpdated: null,
     renderGen: 0,
   };
-  const dirty = { confirmation: false, invite: false };
+  const dirty = { confirmation: false, invite: false, emailSettings: false };
 
   // ── elements ───────────────────────────────────────────────────────────────
   const gateEl      = document.getElementById('gate');
@@ -47,7 +47,7 @@
   const views = {
     waitlist: document.getElementById('view-waitlist'),
     emails:   document.getElementById('view-emails'),
-    system:   document.getElementById('view-system'),
+    settings: document.getElementById('view-settings'),
   };
 
   const waitlistUpdatedEl = document.getElementById('waitlist-updated');
@@ -65,7 +65,7 @@
   const rowsEl = document.getElementById('rows');
   const emptyStateEl = document.getElementById('empty-state');
 
-  const resendBanner = document.getElementById('resend-banner');
+  const emailConfigBanner = document.getElementById('email-config-banner');
   const inviteEditorBanner = document.getElementById('invite-editor-banner');
   const subjInputs   = { confirmation: document.getElementById('subj-confirmation'), invite: document.getElementById('subj-invite') };
   const subjCountEls = { confirmation: document.getElementById('subj-count-confirmation'), invite: document.getElementById('subj-count-invite') };
@@ -76,7 +76,33 @@
   const msgEls       = { confirmation: document.getElementById('msg-confirmation'), invite: document.getElementById('msg-invite') };
   const previewFrames = { confirmation: document.getElementById('preview-confirmation'), invite: document.getElementById('preview-invite') };
 
-  const systemGrid = document.getElementById('system-grid');
+  // Settings view — email delivery card
+  const providerSelect      = document.getElementById('email-provider');
+  const emailGroupResend    = document.getElementById('email-group-resend');
+  const emailGroupSmtp      = document.getElementById('email-group-smtp');
+  const emailGroupFrom      = document.getElementById('email-group-from');
+  const resendKeyStatusEl   = document.getElementById('resend-key-status');
+  const smtpHostInput       = document.getElementById('smtp-host');
+  const smtpPortInput       = document.getElementById('smtp-port');
+  const smtpUsernameInput   = document.getElementById('smtp-username');
+  const smtpPasswordInput   = document.getElementById('smtp-password');
+  const fromNameInput       = document.getElementById('from-name');
+  const fromAddressInput    = document.getElementById('from-address');
+  const fromMismatchWarning = document.getElementById('from-mismatch-warning');
+  const emailMetaEl         = document.getElementById('meta-email-settings');
+  const saveEmailBtn        = document.getElementById('save-email-settings');
+  const resetEmailBtn       = document.getElementById('reset-email-settings');
+  const emailMsgEl          = document.getElementById('msg-email-settings');
+  const testEmailInput      = document.getElementById('test-email-to');
+  const testEmailBtn        = document.getElementById('test-email-btn');
+  const testEmailResultEl   = document.getElementById('test-email-result');
+  // Settings view — invites + environment cards
+  const invitesToggle     = document.getElementById('invites-toggle');
+  const invitesToggleText = document.getElementById('invites-toggle-text');
+  const invitesMetaEl     = document.getElementById('meta-invites');
+  const dropKeyWarning    = document.getElementById('drop-key-warning');
+  const envDropKeyEl      = document.getElementById('env-drop-key');
+  const envResendKeyEl    = document.getElementById('env-resend-key');
 
   const toastEl = document.getElementById('toast');
 
@@ -113,13 +139,27 @@
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
 
-  function isEmailsDirty() {
-    return dirty.confirmation || dirty.invite;
+  // Dirty tracking covers the Emails template editors and the Settings
+  // email-delivery card — each guarded when leaving its own view.
+  function isRouteDirty(route) {
+    if (route === 'emails') return dirty.confirmation || dirty.invite;
+    if (route === 'settings') return dirty.emailSettings;
+    return false;
+  }
+
+  function isAnythingDirty() {
+    return dirty.confirmation || dirty.invite || dirty.emailSettings;
+  }
+
+  function clearRouteDirty(route) {
+    if (route === 'emails') { dirty.confirmation = false; dirty.invite = false; }
+    if (route === 'settings') dirty.emailSettings = false;
   }
 
   function parseRoute(hash) {
     const m = /^#\/(\w+)/.exec(hash || '');
-    const r = m ? m[1] : '';
+    let r = m ? m[1] : '';
+    if (r === 'system') r = 'settings'; // legacy alias — the System view became Settings
     return ROUTES.indexOf(r) !== -1 ? r : null;
   }
 
@@ -164,14 +204,17 @@
     toastTimer = setTimeout(() => { toastEl.hidden = true; }, 4000);
   }
 
-  function showSaveMsg(type, text, isErr) {
-    const el = msgEls[type];
+  function showInlineMsg(el, text, isErr) {
     el.textContent = text;
     el.className = 'save-msg ' + (isErr ? 'err-msg' : 'ok-msg');
     if (!isErr) setTimeout(() => { if (el.textContent === text) el.textContent = ''; }, 3000);
   }
 
-  // ── reusable confirm dialog (4 call sites: reset, missing-vars, dirty nav, dirty logout) ──
+  function showSaveMsg(type, text, isErr) {
+    showInlineMsg(msgEls[type], text, isErr);
+  }
+
+  // ── reusable confirm dialog (resets, missing-vars, dirty nav/logout, invites enable) ──
   function confirmDialog(message, okLabel) {
     return new Promise((resolve) => {
       confirmDialogMsgEl.textContent = message;
@@ -308,13 +351,14 @@
   }
 
   async function handleLogoutClick() {
-    if (isEmailsDirty()) {
+    if (isAnythingDirty()) {
       const confirmed = await confirmDialog(
-        'You have unsaved template changes. Logging out will discard them.', 'Log out'
+        'You have unsaved changes. Logging out will discard them.', 'Log out'
       );
       if (!confirmed) return;
       dirty.confirmation = false;
       dirty.invite = false;
+      dirty.emailSettings = false;
     }
     doLogout();
   }
@@ -344,8 +388,9 @@
     }
   }
 
-  // Refetch entries only (settings don't change at runtime) — used on
-  // visibilitychange -> visible and on navigating into Waitlist.
+  // Refetch entries only — used on visibilitychange -> visible and on
+  // navigating into Waitlist. (Settings and templates update through their
+  // own save flows, which patch state.settings in place.)
   async function refreshEntries() {
     const gen = ++state.renderGen;
     try {
@@ -367,7 +412,7 @@
     state.currentRoute = route;
     views.waitlist.hidden = route !== 'waitlist';
     views.emails.hidden   = route !== 'emails';
-    views.system.hidden   = route !== 'system';
+    views.settings.hidden = route !== 'settings';
     navLinks.forEach((a) => a.classList.toggle('active', a.dataset.route === route));
 
     if (route === 'waitlist') {
@@ -375,21 +420,22 @@
       refreshEntries();
     } else if (route === 'emails') {
       renderEmailsView(); // always repopulates from state, resets dirty flags
-    } else if (route === 'system') {
-      renderSystemView();
+    } else if (route === 'settings') {
+      renderSettingsView(); // always repopulates from state, resets the email-card dirty flag
     }
   }
 
-  // Runs the dirty guard for a leave-Emails move. Resolves true when it is
+  // Runs the dirty guard for leaving a view with unsaved edits (Emails
+  // template editors or the Settings email card). Resolves true when it is
   // safe to proceed (clearing the dirty flags on a consented discard).
-  async function guardLeaveEmails(target) {
-    if (!(state.currentRoute === 'emails' && target !== 'emails' && isEmailsDirty())) return true;
+  async function guardLeaveDirtyView(target) {
+    if (target === state.currentRoute || !isRouteDirty(state.currentRoute)) return true;
+    const what = state.currentRoute === 'emails' ? 'template changes' : 'email settings';
     const confirmed = await confirmDialog(
-      'You have unsaved template changes. Leaving will discard them.', 'Discard'
+      'You have unsaved ' + what + '. Leaving will discard them.', 'Discard'
     );
     if (!confirmed) return false;
-    dirty.confirmation = false;
-    dirty.invite = false;
+    clearRouteDirty(state.currentRoute);
     return true;
   }
 
@@ -398,7 +444,7 @@
   async function onNavClick(e, a) {
     e.preventDefault();
     const target = a.dataset.route;
-    if (!(await guardLeaveEmails(target))) return; // cancelled — URL untouched
+    if (!(await guardLeaveDirtyView(target))) return; // cancelled — URL untouched
     location.hash = '#/' + target; // normal push; hashchange finds a clean state
   }
 
@@ -417,12 +463,16 @@
       return;
     }
 
-    if (state.currentRoute === 'emails' && target !== 'emails' && isEmailsDirty()) {
-      guardLeaveEmails(target).then((proceed) => {
+    // Normalize alias hashes (#/system → #/settings) without firing hashchange.
+    if (location.hash !== '#/' + target) history.replaceState(null, '', '#/' + target);
+
+    if (target !== state.currentRoute && isRouteDirty(state.currentRoute)) {
+      const from = state.currentRoute;
+      guardLeaveDirtyView(target).then((proceed) => {
         if (proceed) {
           navigateRoute(target);
         } else {
-          history.replaceState(null, '', '#/emails'); // restore URL, keep the view
+          history.replaceState(null, '', '#/' + from); // restore URL, keep the view
         }
       });
       return;
@@ -620,11 +670,24 @@
     updatePreview(type);
   }
 
+  // Provider-aware "email won't send" copy shared by the Emails banner.
+  function emailNotConfiguredMessage() {
+    const provider = state.settings.email ? state.settings.email.provider : 'none';
+    if (provider === 'resend') {
+      return 'Email sending is not working — Resend is selected but RESEND_API_KEY is not set in the server environment.';
+    }
+    if (provider === 'smtp') {
+      return 'Email sending is not working — SMTP settings are incomplete. Finish setup in Settings.';
+    }
+    return 'Email sending is not configured — set it up in Settings.';
+  }
+
   function renderEmailsView() {
     const templates = state.settings.templates;
     populateTemplateEditor('confirmation', templates.confirmation);
     populateTemplateEditor('invite', templates.invite);
-    resendBanner.hidden = state.settings.emailConfigured;
+    emailConfigBanner.hidden = state.settings.emailConfigured;
+    if (!state.settings.emailConfigured) emailConfigBanner.textContent = emailNotConfiguredMessage();
     inviteEditorBanner.hidden = state.invitesEnabled;
   }
 
@@ -733,21 +796,264 @@
     });
   }
 
-  // ── System view ────────────────────────────────────────────────────────────
-  function renderSystemView() {
+  // ── Settings view ──────────────────────────────────────────────────────────
+  // The email card is a form over state.settings.email; the SMTP password is
+  // write-only: the input is always rendered empty, the server never echoes
+  // the stored value, and the POST includes it only when the user typed one.
+  let testEmailSending = false;
+
+  function parseFromField(from) {
+    const m = /^(.*)<([^>]*)>\s*$/.exec(from || '');
+    if (m) return { name: m[1].trim().replace(/^"(.*)"$/, '$1'), address: m[2].trim() };
+    return { name: '', address: String(from || '').trim() };
+  }
+
+  function composeFromField() {
+    const name = fromNameInput.value.trim();
+    const address = fromAddressInput.value.trim();
+    return name ? name + ' <' + address + '>' : address;
+  }
+
+  // Mirrors the server's provider-aware "email is usable" rule so banners
+  // update immediately after a save; the next loadAll re-syncs regardless.
+  function computeEmailConfigured(s) {
+    if (s.email.provider === 'resend') return !!s.resendKeyConfigured;
+    if (s.email.provider === 'smtp') return !!(s.email.smtp.host && s.email.smtp.username && s.email.smtp.hasPassword);
+    return false;
+  }
+
+  function updateProviderGroups() {
+    const p = providerSelect.value;
+    emailGroupResend.hidden = p !== 'resend';
+    emailGroupSmtp.hidden   = p !== 'smtp';
+    emailGroupFrom.hidden   = p === 'none';
+    updateFromMismatchWarning();
+  }
+
+  function updateFromMismatchWarning() {
+    const addr = fromAddressInput.value.trim().toLowerCase();
+    const user = smtpUsernameInput.value.trim().toLowerCase();
+    fromMismatchWarning.hidden = !(providerSelect.value === 'smtp' && addr && user && addr !== user);
+  }
+
+  function updateTestEmailButton() {
+    testEmailBtn.disabled = dirty.emailSettings || testEmailSending;
+    testEmailBtn.title = dirty.emailSettings ? 'Save your settings first' : '';
+  }
+
+  function markEmailSettingsDirty() {
+    dirty.emailSettings = true;
+    updateFromMismatchWarning();
+    updateTestEmailButton();
+  }
+
+  function showTestEmailResult(text, isErr) {
+    testEmailResultEl.textContent = text;
+    testEmailResultEl.className = 'test-email-result ' + (isErr ? 'err' : 'ok');
+  }
+
+  function renderSettingsView() {
+    if (!state.settings) return;
     const s = state.settings;
-    systemGrid.innerHTML =
-      '<span class="system-label">Resend</span>' +
-      (s.emailConfigured
-        ? '<span class="ok">Configured</span><span class="system-hint"></span>'
-        : '<span class="err">Not configured</span><span class="system-hint">Set RESEND_API_KEY in the server environment to enable outgoing email.</span>') +
-      '<span class="system-label">Sender address</span>' +
-      '<span>' + esc(s.emailFrom) + '</span>' +
-      '<span class="system-hint">Set EMAIL_FROM to change the "from" address on outgoing email.</span>' +
-      '<span class="system-label">Invites</span>' +
-      (state.invitesEnabled
-        ? '<span class="ok">Enabled</span><span class="system-hint"></span>'
-        : '<span class="warn">Disabled</span><span class="system-hint">Set WAITLIST_INVITES_ENABLED=true once Docker isolation is on.</span>');
+    const email = s.email;
+
+    providerSelect.value = email.provider;
+    smtpHostInput.value = email.smtp.host || '';
+    smtpPortInput.value = String(email.smtp.port || 465);
+    smtpUsernameInput.value = email.smtp.username || '';
+    smtpPasswordInput.value = ''; // write-only — never render the stored value
+    smtpPasswordInput.placeholder = email.smtp.hasPassword ? '(unchanged)' : '(not set)';
+    const from = parseFromField(email.from);
+    fromNameInput.value = from.name;
+    fromAddressInput.value = from.address;
+    emailMetaEl.textContent = email.savedAt
+      ? 'Last saved: ' + fmtDateTimeSafe(email.savedAt)
+      : 'Using server env/defaults.';
+    emailMsgEl.textContent = '';
+    testEmailResultEl.textContent = '';
+
+    resendKeyStatusEl.textContent = s.resendKeyConfigured
+      ? 'Configured ✓'
+      : 'Not set — set RESEND_API_KEY in the environment';
+    resendKeyStatusEl.className = 'static-value ' + (s.resendKeyConfigured ? 'ok' : 'warn');
+
+    dirty.emailSettings = false;
+    updateProviderGroups();
+    updateTestEmailButton();
+    renderInvitesCard();
+    renderEnvCard();
+  }
+
+  function renderInvitesCard() {
+    const inv = state.settings.invites;
+    invitesToggle.checked = inv.enabled;
+    invitesToggleText.textContent = inv.enabled
+      ? 'Invites are enabled — Approve provisions a DROP account and emails the user their credentials.'
+      : 'Invites are disabled — Approve only marks the entry as approved; no account is created and nothing is emailed.';
+    invitesMetaEl.textContent = inv.savedAt
+      ? 'Last saved: ' + fmtDateTimeSafe(inv.savedAt)
+      : 'Using server env/defaults.';
+    dropKeyWarning.hidden = inv.dropKeyConfigured;
+  }
+
+  function renderEnvCard() {
+    const s = state.settings;
+    const dropOk = s.invites.dropKeyConfigured;
+    envDropKeyEl.textContent = dropOk ? 'Configured ✓' : 'Not set ✗';
+    envDropKeyEl.className = dropOk ? 'ok' : 'err';
+    const resendOk = s.resendKeyConfigured;
+    envResendKeyEl.textContent = resendOk ? 'Configured ✓' : 'Not set ✗';
+    envResendKeyEl.className = resendOk ? 'ok' : 'err';
+  }
+
+  async function handleSaveEmailSettings() {
+    const provider = providerSelect.value;
+    const port = Number(smtpPortInput.value);
+    const portValid = Number.isInteger(port) && port >= 1 && port <= 65535;
+    if (provider === 'smtp' && !portValid) {
+      showInlineMsg(emailMsgEl, 'Port must be a whole number between 1 and 65535.', true);
+      return;
+    }
+
+    const smtp = {
+      host: smtpHostInput.value.trim(),
+      port: portValid ? port : 465,
+      username: smtpUsernameInput.value.trim(),
+    };
+    if (smtpPasswordInput.value) smtp.password = smtpPasswordInput.value; // omitted = keep existing
+
+    saveEmailBtn.disabled = true;
+    saveEmailBtn.textContent = 'Saving…';
+    try {
+      const result = await api('/api/admin/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: { provider, from: composeFromField(), smtp } }),
+      });
+      if (!result.ok) {
+        showInlineMsg(emailMsgEl, result.error || 'Save failed.', true);
+      } else {
+        state.settings.email = result.email;
+        state.settings.emailConfigured = computeEmailConfigured(state.settings);
+        renderSettingsView(); // repopulates from the fresh server view; clears the password input
+        showInlineMsg(emailMsgEl, 'Saved.', false);
+      }
+    } catch (err) {
+      if (err !== SENTINEL_ABORT) showInlineMsg(emailMsgEl, err.message || 'Save failed — network error.', true);
+    } finally {
+      // Re-enable on every exit path, including the 403-sentinel abort.
+      saveEmailBtn.disabled = false;
+      saveEmailBtn.textContent = 'Save';
+    }
+  }
+
+  async function handleResetEmailSettings() {
+    const proceed = await confirmDialog('Discard saved email settings and return to server env/defaults?', 'Reset');
+    if (!proceed) return;
+
+    resetEmailBtn.disabled = true;
+    try {
+      const result = await api('/api/admin/settings/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ section: 'email' }),
+      });
+      if (!result.ok) {
+        showInlineMsg(emailMsgEl, result.error || 'Reset failed.', true);
+      } else {
+        state.settings.email = result.email;
+        state.settings.emailConfigured = computeEmailConfigured(state.settings);
+        renderSettingsView();
+        showInlineMsg(emailMsgEl, 'Reset to env/defaults.', false);
+      }
+    } catch (err) {
+      if (err !== SENTINEL_ABORT) showInlineMsg(emailMsgEl, err.message || 'Reset failed — network error.', true);
+    } finally {
+      resetEmailBtn.disabled = false; // every exit path, including the 403-sentinel abort
+    }
+  }
+
+  async function handleSendTestEmail() {
+    const to = testEmailInput.value.trim();
+    if (!to) {
+      showTestEmailResult('Enter a recipient address first.', true);
+      return;
+    }
+
+    testEmailSending = true;
+    updateTestEmailButton();
+    testEmailBtn.textContent = 'Sending…';
+    try {
+      const result = await api('/api/admin/test-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to }),
+      });
+      if (result.ok && result.sent) {
+        showTestEmailResult('Test email sent to ' + to, false);
+      } else {
+        showTestEmailResult(result.error || 'Test email failed.', true);
+      }
+    } catch (err) {
+      if (err !== SENTINEL_ABORT) showTestEmailResult(err.message || 'Test email failed — network error.', true);
+    } finally {
+      testEmailSending = false;
+      testEmailBtn.textContent = 'Send test';
+      updateTestEmailButton();
+    }
+  }
+
+  async function handleInvitesToggle() {
+    const wantEnabled = invitesToggle.checked;
+    if (wantEnabled) {
+      const proceed = await confirmDialog(
+        'Enabling invites means Approve provisions a REAL account on your DROP server and emails credentials to the user. Enable?',
+        'Enable'
+      );
+      if (!proceed) {
+        invitesToggle.checked = false; // cancelled — revert without posting
+        return;
+      }
+    }
+
+    invitesToggle.disabled = true;
+    try {
+      const result = await api('/api/admin/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invitesEnabled: wantEnabled }),
+      });
+      if (!result.ok) {
+        invitesToggle.checked = !wantEnabled;
+        showToast(result.error || 'Could not update invites.', true);
+      } else {
+        state.settings.invites = result.invites;
+        state.settings.invitesEnabled = result.invites.enabled;
+        // Waitlist banner/buttons and the Emails invite banner read this; they
+        // re-render from state when their views are entered.
+        state.invitesEnabled = result.invites.enabled;
+        renderInvitesCard();
+      }
+    } catch (err) {
+      if (err === SENTINEL_ABORT) return;
+      invitesToggle.checked = !wantEnabled;
+      showToast(err.message || 'Could not update invites — network error.', true);
+    } finally {
+      invitesToggle.disabled = false;
+    }
+  }
+
+  function wireSettingsView() {
+    providerSelect.addEventListener('change', () => {
+      markEmailSettingsDirty();
+      updateProviderGroups();
+    });
+    [smtpHostInput, smtpPortInput, smtpUsernameInput, smtpPasswordInput, fromNameInput, fromAddressInput]
+      .forEach((el) => el.addEventListener('input', markEmailSettingsDirty));
+    saveEmailBtn.addEventListener('click', handleSaveEmailSettings);
+    resetEmailBtn.addEventListener('click', handleResetEmailSettings);
+    testEmailBtn.addEventListener('click', handleSendTestEmail);
+    invitesToggle.addEventListener('change', handleInvitesToggle);
   }
 
   // ── wire up ────────────────────────────────────────────────────────────────
@@ -766,6 +1072,7 @@
   });
   exportCsvBtn.addEventListener('click', downloadCsv);
   wireEmailsView();
+  wireSettingsView();
 
   credsDialogEl.addEventListener('cancel', (e) => e.preventDefault()); // block Esc dismissal
   credsCloseBtn.addEventListener('click', closeCredsDialog);
@@ -781,7 +1088,7 @@
 
   window.addEventListener('hashchange', onHashChange);
   window.addEventListener('beforeunload', (e) => {
-    if (isEmailsDirty()) { e.preventDefault(); e.returnValue = ''; }
+    if (isAnythingDirty()) { e.preventDefault(); e.returnValue = ''; }
   });
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && state.loggedIn && state.currentRoute === 'waitlist') {

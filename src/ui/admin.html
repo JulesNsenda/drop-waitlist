@@ -37,7 +37,7 @@
       Waitlist <span class="badge" id="nav-pending-badge" hidden></span>
     </a>
     <a href="#/emails" class="nav-item" data-route="emails">Emails</a>
-    <a href="#/system" class="nav-item" data-route="system">System</a>
+    <a href="#/settings" class="nav-item" data-route="settings">Settings</a>
     <button id="logout-btn" class="nav-item nav-logout" type="button">Logout</button>
   </nav>
 
@@ -75,7 +75,7 @@
 
       <div class="note" id="invites-banner" hidden>
         Invites are disabled — approving only marks entries; no accounts are created
-        until WAITLIST_INVITES_ENABLED=true once Docker isolation is on.
+        until you enable invites in Settings.
       </div>
 
       <div class="toolbar">
@@ -98,10 +98,8 @@
     <section id="view-emails" class="view" hidden>
       <div class="view-head"><h1>Emails</h1></div>
 
-      <div class="note" id="resend-banner" hidden>
-        Resend is not configured — emails cannot be sent. Set RESEND_API_KEY in the
-        server environment to enable outgoing email.
-      </div>
+      <!-- Text filled by renderEmailsView — provider-aware. -->
+      <div class="note" id="email-config-banner" hidden></div>
 
       <!-- Confirmation email -->
       <div class="editor-card">
@@ -146,8 +144,8 @@
           <p class="editor-sub">Sent when you approve someone from the waitlist.</p>
         </div>
         <div class="note" id="invite-editor-banner" hidden>
-          Invite sending is disabled — set WAITLIST_INVITES_ENABLED=true once Docker
-          isolation is on. You can still edit and save this template.
+          Invite sending is disabled — enable invites in Settings. You can still edit
+          and save this template.
         </div>
         <div class="editor-meta" id="meta-invite"></div>
         <div class="field">
@@ -183,10 +181,130 @@
       </div>
     </section>
 
-    <!-- ── System view ──────────────────────────────────────────────────────── -->
-    <section id="view-system" class="view" hidden>
-      <div class="view-head"><h1>System</h1></div>
-      <div class="system-grid" id="system-grid"></div>
+    <!-- ── Settings view ────────────────────────────────────────────────────── -->
+    <section id="view-settings" class="view" hidden>
+      <div class="view-head"><h1>Settings</h1></div>
+
+      <!-- Email delivery -->
+      <div class="editor-card">
+        <div class="editor-head">
+          <h2>Email delivery</h2>
+          <p class="editor-sub">How outgoing email — confirmations, invites, tests — is sent.</p>
+        </div>
+        <div class="editor-meta" id="meta-email-settings"></div>
+
+        <div class="field">
+          <label for="email-provider">Provider</label>
+          <select id="email-provider">
+            <option value="none">None (email disabled)</option>
+            <option value="resend">Resend</option>
+            <option value="smtp">SMTP</option>
+          </select>
+        </div>
+
+        <div id="email-group-resend" hidden>
+          <div class="field">
+            <label>API key</label>
+            <span class="static-value" id="resend-key-status"></span>
+          </div>
+        </div>
+
+        <div id="email-group-smtp" hidden>
+          <div class="field-grid">
+            <div class="field">
+              <label for="smtp-host">Host</label>
+              <input type="text" id="smtp-host" autocomplete="off" placeholder="smtp.hostinger.com">
+            </div>
+            <div class="field">
+              <label for="smtp-port">Port</label>
+              <input type="number" id="smtp-port" value="465" min="1" max="65535">
+            </div>
+          </div>
+          <div class="field-grid">
+            <div class="field">
+              <label for="smtp-username">Username</label>
+              <input type="text" id="smtp-username" autocomplete="off">
+            </div>
+            <div class="field">
+              <label for="smtp-password">Password</label>
+              <input type="password" id="smtp-password" autocomplete="off">
+            </div>
+          </div>
+          <div class="field">
+            <label>Encryption</label>
+            <span class="static-value">SSL/TLS (port 465)</span>
+          </div>
+          <p class="field-note">Hostinger: smtp.hostinger.com · port 465 · username is the full mailbox address</p>
+        </div>
+
+        <div id="email-group-from" hidden>
+          <div class="field-grid">
+            <div class="field">
+              <label for="from-name">From name</label>
+              <input type="text" id="from-name" autocomplete="off" placeholder="DROP">
+            </div>
+            <div class="field">
+              <label for="from-address">From address</label>
+              <input type="email" id="from-address" autocomplete="off" placeholder="hello@example.com">
+              <p class="field-note" id="from-mismatch-warning" hidden>Must be the mailbox you sign in with (or one of its aliases) — otherwise Hostinger rejects the send</p>
+            </div>
+          </div>
+          <p class="field-note">SPF/DKIM are automatic when your domain uses Hostinger nameservers.</p>
+        </div>
+
+        <div class="editor-actions">
+          <button id="save-email-settings" type="button">Save</button>
+          <button class="btn-ghost btn-danger" id="reset-email-settings" type="button">Reset to env…</button>
+          <span class="save-msg" id="msg-email-settings" aria-live="polite"></span>
+        </div>
+
+        <div class="test-email-row">
+          <div class="field">
+            <label for="test-email-to">Send a test email</label>
+            <div class="field-row">
+              <input type="email" id="test-email-to" autocomplete="off" placeholder="you@example.com">
+              <button class="btn-ghost" id="test-email-btn" type="button">Send test</button>
+            </div>
+          </div>
+          <p class="test-email-result" id="test-email-result" aria-live="polite"></p>
+        </div>
+      </div>
+
+      <!-- Invites -->
+      <div class="editor-card">
+        <div class="editor-head">
+          <h2>Invites</h2>
+          <p class="editor-sub">Controls what approving a waitlist entry does.</p>
+        </div>
+        <div class="editor-meta" id="meta-invites"></div>
+        <div class="note" id="drop-key-warning" hidden>
+          DROP_ADMIN_API_KEY is not set — approvals will fail until it is configured
+          in the environment.
+        </div>
+        <label class="switch-row">
+          <input type="checkbox" id="invites-toggle">
+          <span class="switch-text" id="invites-toggle-text"></span>
+        </label>
+      </div>
+
+      <!-- Environment (read-only) -->
+      <div class="editor-card">
+        <div class="editor-head">
+          <h2>Environment</h2>
+          <p class="editor-sub">Secrets stay in the server environment — read-only here.</p>
+        </div>
+        <div class="env-grid">
+          <span class="env-label">Admin token</span>
+          <span class="ok">Configured ✓</span>
+          <span class="env-hint">Set via WAITLIST_ADMIN_TOKEN in the server environment.</span>
+          <span class="env-label">DROP admin API key</span>
+          <span id="env-drop-key"></span>
+          <span class="env-hint">Set via DROP_ADMIN_API_KEY — required for approvals to provision accounts.</span>
+          <span class="env-label">Resend API key</span>
+          <span id="env-resend-key"></span>
+          <span class="env-hint">Set via RESEND_API_KEY — used when the email provider is Resend.</span>
+        </div>
+      </div>
     </section>
 
   </main>
