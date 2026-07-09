@@ -1198,6 +1198,14 @@
     }
   });
 
+  // Theme toggle — the current theme is set on <html data-theme> before first
+  // paint by the inline head script; this just flips and persists it.
+  document.getElementById('theme-toggle').addEventListener('click', () => {
+    const next = (document.documentElement.getAttribute('data-theme') || 'dark') === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('drop-theme', next); } catch { /* private mode */ }
+  });
+
   window.addEventListener('hashchange', onHashChange);
   window.addEventListener('beforeunload', (e) => {
     if (isAnythingDirty()) { e.preventDefault(); e.returnValue = ''; }

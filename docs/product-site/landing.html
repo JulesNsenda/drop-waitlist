@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DROP — Drop a folder. Get a URL.</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%230B0E14'/><path d='M32 8C21 22 14 31 14 41a18 18 0 0 0 36 0C50 31 43 22 32 8Z' fill='%232E9BFE'/></svg>">
+  <meta name="theme-color" content="#0B0E14">
+  <meta name="description" content="DROP is a lightweight, self-hosted PaaS engineered for the drop-folder-and-deploy workflow. Zero configuration for 80% of use cases. Join the private beta.">
+  <meta property="og:title" content="DROP — Drop a folder. Get a URL.">
+  <meta property="og:description" content="DROP is a lightweight, self-hosted PaaS engineered for the drop-folder-and-deploy workflow. Zero configuration for 80% of use cases. Join the private beta.">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary">
+  <!-- Set the theme before first paint to avoid a flash of the wrong theme. -->
+  <script>(function(){try{var t=localStorage.getItem('drop-theme')||'dark';document.documentElement.setAttribute('data-theme',t)}catch(e){document.documentElement.setAttribute('data-theme','dark')}})();</script>
+  <link rel="stylesheet" href="./landing.css">
+</head>
+<body>
+
+<nav class="nav" aria-label="Main">
+  <a class="brand" href="/">
+    <span class="drop-mark" aria-hidden="true"></span>
+    <span class="brand-name">DROP</span>
+    <span class="brand-ver">v2.0.0-rc.1</span>
+  </a>
+  <div class="nav-links">
+    <a href="#features">Features</a>
+    <a href="#how">How it works</a>
+    <a href="#config">Config</a>
+    <a href="#cli">CLI</a>
+  </div>
+  <div class="nav-actions">
+    <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Toggle theme">
+      <span class="theme-icon" aria-hidden="true"></span>
+    </button>
+    <a class="btn btn-primary btn-nav" href="#join">Join the beta</a>
+  </div>
+</nav>
+
+<div class="hero-bg">
+  <section class="container hero">
+    <div class="hero-copy">
+      <div class="hero-badge">
+        <span class="pulse-dot" aria-hidden="true"></span>
+        v2.0.0-rc.1 · self-hosted PaaS
+      </div>
+      <h1>Drop a folder.<br>Get a URL.</h1>
+      <p class="hero-sub">A lightweight, self-hosted platform engineered for the drop-folder-and-deploy workflow. Zero configuration for 80% of use cases — auto-detect, build, and ship Node.js, Python, static sites, and containers.</p>
+      <div class="hero-ctas">
+        <a class="btn btn-primary" href="#join"><span class="btn-prompt" aria-hidden="true">$</span>drop join --beta</a>
+        <a class="btn btn-ghost" href="#how">How it works →</a>
+      </div>
+      <div class="hero-points">
+        <span>◇ MIT licensed</span><span>◇ No vendor lock-in</span><span>◇ Runs anywhere</span>
+      </div>
+    </div>
+
+    <div class="hero-visual">
+      <div class="terminal">
+        <div class="terminal-bar">
+          <span class="tl-dot tl-red" aria-hidden="true"></span>
+          <span class="tl-dot tl-yellow" aria-hidden="true"></span>
+          <span class="tl-dot tl-green" aria-hidden="true"></span>
+          <span class="terminal-title">~/projects — drop</span>
+        </div>
+        <div class="terminal-body">
+          <div><span class="t-accent">$</span> <span class="t-text">drop deploy ./myapp</span></div>
+          <div class="t-dim"><span class="t-accent2">→</span> Detecting app type… <span class="t-text">Next.js 15</span> <span class="t-green">✓</span></div>
+          <div class="t-dim"><span class="t-accent2">→</span> Provisioning PostgreSQL… <span class="t-text">DATABASE_URL</span> <span class="t-green">✓</span></div>
+          <div class="t-dim"><span class="t-accent2">→</span> Building… done in <span class="t-text">8.2s</span></div>
+          <div class="t-dim"><span class="t-accent2">→</span> Starting via PM2… <span class="t-green">online ✓</span></div>
+          <div class="t-done">✔ Deployed → <a href="#join">https://myapp.localhost</a><span class="cursor" aria-hidden="true"></span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<section id="runtimes" class="container runtimes-section">
+  <div class="runtimes">
+    <span class="runtimes-label">Detects &amp; runs</span>
+    <span class="runtime">Node.js</span>
+    <span class="runtime">Python</span>
+    <span class="runtime">Docker</span>
+    <span class="runtime">Static</span>
+    <span class="runtime">Next.js</span>
+    <span class="runtime">Nuxt</span>
+    <span class="runtime">Express</span>
+    <span class="runtime">FastAPI</span>
+    <span class="runtime">Flask</span>
+  </div>
+</section>
+
+<section id="how" class="container how-section">
+  <div class="section-head centered">
+    <div class="eyebrow">How it works</div>
+    <h2>Three steps. No YAML required.</h2>
+  </div>
+  <div class="steps-grid">
+    <div class="step-card">
+      <div class="step-num">01 · DROP</div>
+      <div class="step-title">Drop a folder</div>
+      <p>Point DROP at any project directory. No Dockerfile, no build script, no config file needed to begin.</p>
+    </div>
+    <div class="step-card">
+      <div class="step-num">02 · DETECT</div>
+      <div class="step-title">Auto-detect &amp; build</div>
+      <p>DROP recognizes the runtime and framework — Next.js, FastAPI, Express and more — then installs and builds automatically.</p>
+    </div>
+    <div class="step-card">
+      <div class="step-num">03 · DEPLOY</div>
+      <div class="step-title">Get a URL</div>
+      <p>Your app comes online at myapp.localhost with a persistent port, PM2 process management, and automatic HTTPS.</p>
+    </div>
+  </div>
+</section>
+
+<section id="features" class="container features-section">
+  <div class="section-head">
+    <div class="eyebrow">Features</div>
+    <h2>Everything a deploy needs. Nothing it doesn't.</h2>
+    <p class="section-sub">DROP handles detection, build, routing, TLS, databases, processes, and logs — so your folder is the only config.</p>
+  </div>
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-icon" aria-hidden="true">◇</div>
+      <div class="feature-title">Zero-Config Deployment</div>
+      <p>Auto-detects app type, builds, and starts automatically. No setup for most projects.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon" aria-hidden="true">⬡</div>
+      <div class="feature-title">Hostname Routing</div>
+      <p>Reach every app at myapp.localhost with clean, per-app routing via Caddy.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon" aria-hidden="true">⚿</div>
+      <div class="feature-title">Automatic HTTPS</div>
+      <p>Let's Encrypt certificates provisioned and renewed with zero configuration.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon" aria-hidden="true">↻</div>
+      <div class="feature-title">Hot Reload</div>
+      <p>Edit files and your app rebuilds and restarts automatically — no manual redeploy.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon" aria-hidden="true">⛁</div>
+      <div class="feature-title">PostgreSQL Auto-Provisioning</div>
+      <p>Each app gets its own database with DATABASE_URL injected into the environment.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon" aria-hidden="true">◈</div>
+      <div class="feature-title">Multi-Runtime Support</div>
+      <p>Node.js, Python, Docker, and static sites — with framework detection built in.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon" aria-hidden="true">⟲</div>
+      <div class="feature-title">Process Management</div>
+      <p>Built on PM2 for reliable process supervision with automatic restart on failure.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon" aria-hidden="true">▤</div>
+      <div class="feature-title">Auto-Capture Logging</div>
+      <p>stdout and stderr captured to dated log files automatically, streamed to the dashboard.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon" aria-hidden="true">⌘</div>
+      <div class="feature-title">REST API + CLI</div>
+      <p>Full REST API with JWT and API-key auth, plus a complete command-line tool.</p>
+    </div>
+  </div>
+</section>
+
+<section id="dashboard" class="container dash-section">
+  <div class="dash-panel">
+    <div class="dash-grid">
+      <div class="dash-copy">
+        <div class="eyebrow">Web Dashboard</div>
+        <h2>Watch every app in real time.</h2>
+        <p>Live process health, streaming stdout/stderr, per-app metrics, database status and routing — all at <code>/dashboard</code>. Built on PM2 for reliable auto-restart.</p>
+        <a class="btn btn-primary" href="#join">Get early access →</a>
+      </div>
+      <div class="dash-visual">
+        <div class="dash-mock">
+          <div class="dash-mock-bar">myapp.localhost/dashboard</div>
+          <div class="dash-mock-rows">
+            <div class="dash-row">
+              <span class="dash-dot dot-green" aria-hidden="true"></span>
+              <span class="dash-name">myapp</span>
+              <span class="dash-meta">:4310 · node</span>
+              <span class="dash-cpu">0.4%</span>
+            </div>
+            <div class="dash-row">
+              <span class="dash-dot dot-green" aria-hidden="true"></span>
+              <span class="dash-name">api-gateway</span>
+              <span class="dash-meta">:4311 · docker</span>
+              <span class="dash-cpu">1.2%</span>
+            </div>
+            <div class="dash-row">
+              <span class="dash-dot dot-yellow" aria-hidden="true"></span>
+              <span class="dash-name">analytics</span>
+              <span class="dash-meta">:4312 · python</span>
+              <span class="dash-cpu">3.8%</span>
+            </div>
+            <div class="dash-row">
+              <span class="dash-dot dot-green" aria-hidden="true"></span>
+              <span class="dash-name">docs-site</span>
+              <span class="dash-meta">:4313 · static</span>
+              <span class="dash-cpu">0.0%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="config" class="container config-section">
+  <div class="config-copy">
+    <div class="eyebrow">Escape hatch</div>
+    <h2>Zero config by default. Full control when you want it.</h2>
+    <p>80% of apps need nothing. For the other 20%, drop a <code>drop.yaml</code> to pin runtime, custom domains, env, and persistent data directories that survive upgrades.</p>
+    <div class="config-points">
+      <div class="config-point"><span aria-hidden="true">▸</span>Pin runtime &amp; framework</div>
+      <div class="config-point"><span aria-hidden="true">▸</span>Custom per-app domains</div>
+      <div class="config-point"><span aria-hidden="true">▸</span>Inject environment variables</div>
+      <div class="config-point"><span aria-hidden="true">▸</span>Persistent data dirs (DROP_DATA_DIR)</div>
+    </div>
+  </div>
+  <div class="code-window">
+    <div class="code-window-bar">drop.yaml</div>
+    <pre><span class="y-key">name</span>: myapp
+<span class="y-key">runtime</span>: node
+<span class="y-key">domains</span>:
+  - <span class="y-val">app.example.com</span>
+<span class="y-key">database</span>: postgres
+<span class="y-key">env</span>:
+  <span class="y-key">NODE_ENV</span>: production
+<span class="y-key">persist</span>:
+  - <span class="y-val">./uploads</span>
+  - <span class="y-val">./data</span></pre>
+  </div>
+</section>
+
+<section id="cli" class="container cli-section">
+  <div class="cli-panel">
+    <div class="cli-copy">
+      <div class="eyebrow">Command line</div>
+      <h2>Install once. Deploy anything.</h2>
+      <p>A full-featured CLI plus a REST API secured with JWT and API keys. Manage apps, logs, and domains from your terminal or CI.</p>
+      <a class="cli-link" href="#join">Get early access to the CLI →</a>
+    </div>
+    <div class="cli-cmds">
+      <div class="cli-cmd">
+        <span class="t-accent" aria-hidden="true">$</span>
+        <span class="cli-cmd-text">drop deploy ./app</span>
+        <span class="cli-cmd-desc">ship it</span>
+      </div>
+      <div class="cli-cmd">
+        <span class="t-accent" aria-hidden="true">$</span>
+        <span class="cli-cmd-text">drop logs myapp -f</span>
+        <span class="cli-cmd-desc">tail logs</span>
+      </div>
+      <div class="cli-cmd">
+        <span class="t-accent" aria-hidden="true">$</span>
+        <span class="cli-cmd-text">drop ps</span>
+        <span class="cli-cmd-desc">list apps</span>
+      </div>
+      <div class="cli-cmd">
+        <span class="t-accent" aria-hidden="true">$</span>
+        <span class="cli-cmd-text">drop domain add app.com</span>
+        <span class="cli-cmd-desc">route</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="join" class="container cta-section">
+  <div class="cta-panel">
+    <span class="drop-mark drop-mark-lg" aria-hidden="true"></span>
+    <h2>Drop a folder. Get a URL.</h2>
+    <p>Self-host DROP in minutes. Zero configuration for 80% of use cases. Join the private beta and be first in line.</p>
+    <form id="f" class="join-form">
+      <input id="email" type="email" placeholder="you@example.com" required autocomplete="email"
+             aria-label="Email address" autocapitalize="none" spellcheck="false">
+      <input id="name" type="text" placeholder="Name (optional)" autocomplete="name" aria-label="Name (optional)">
+      <!-- Honeypot: bots fill this; real users never see it. Styled off-screen,
+           not type=hidden, to avoid password-manager auto-fill. The name must stay
+           non-semantic: Chrome ignores autocomplete="off" and autofills anything
+           its heuristics classify (a field named "company" gets the user's saved
+           organization), which silently flagged real signups as bots. -->
+      <input id="contact_pref_x" name="contact_pref_x" type="text" tabindex="-1" autocomplete="off"
+             aria-hidden="true"
+             style="position:absolute;left:-9999px;opacity:0;height:0;width:0;border:0;padding:0">
+      <button id="b" class="btn btn-primary" type="submit">Join the beta</button>
+    </form>
+    <div class="msg" id="m" role="status" aria-live="polite"></div>
+    <div class="cta-note">This waitlist runs on DROP — the self-hosted PaaS you're signing up for :)</div>
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="container footer-grid">
+    <div class="footer-brand">
+      <div class="footer-logo">
+        <span class="drop-mark drop-mark-sm" aria-hidden="true"></span>
+        <span>DROP</span>
+      </div>
+      <p>Deploy · Run · Operate · Publish. A lightweight, self-hosted PaaS for the drop-folder-and-deploy workflow.</p>
+      <div class="footer-status">
+        <span class="status-dot" aria-hidden="true"></span>
+        All systems operational
+      </div>
+    </div>
+    <div class="footer-col">
+      <div class="footer-col-title">Product</div>
+      <div class="footer-col-links">
+        <a href="#features">Features</a>
+        <a href="#how">How it works</a>
+        <a href="#dashboard">Dashboard</a>
+        <a href="#runtimes">Runtimes</a>
+      </div>
+    </div>
+    <div class="footer-col">
+      <div class="footer-col-title">Developers</div>
+      <div class="footer-col-links">
+        <a href="#cli">CLI</a>
+        <a href="#cli">REST API</a>
+        <a href="#config">drop.yaml</a>
+      </div>
+    </div>
+    <div class="footer-col">
+      <div class="footer-col-title">Beta</div>
+      <div class="footer-col-links">
+        <a href="#join">Join the waitlist</a>
+        <a href="/admin">Admin sign-in</a>
+        <a href="/health">Status</a>
+      </div>
+    </div>
+  </div>
+  <div class="footer-bottom-wrap">
+    <div class="container footer-bottom">
+      <span>© 2026 DROP · MIT License</span>
+      <span>Built for Windows · Linux · macOS</span>
+    </div>
+  </div>
+</footer>
+
+<script src="./landing.js"></script>
+</body>
+</html>

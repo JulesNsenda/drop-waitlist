@@ -4,8 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>DROP waitlist — admin</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%234f46e5'/><path d='M20 18h12a14 14 0 0 1 0 28H20z' fill='white'/></svg>">
-  <meta name="theme-color" content="#0a0a0f">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%230B0E14'/><path d='M32 8C21 22 14 31 14 41a18 18 0 0 0 36 0C50 31 43 22 32 8Z' fill='%232E9BFE'/></svg>">
+  <meta name="theme-color" content="#0B0E14">
+  <!-- Set the theme before first paint to avoid a flash of the wrong theme. -->
+  <script>(function(){try{var t=localStorage.getItem('drop-theme')||'dark';document.documentElement.setAttribute('data-theme',t)}catch(e){document.documentElement.setAttribute('data-theme','dark')}})();</script>
   <link rel="stylesheet" href="/ui/shared.css">
   <link rel="stylesheet" href="/ui/admin.css">
 </head>
@@ -14,7 +16,7 @@
 <!-- ── login gate ───────────────────────────────────────────────────────────── -->
 <div id="gate" class="gate">
   <div class="gate-card">
-    <div class="logo-mark">◧</div>
+    <div class="logo-mark" aria-hidden="true"></div>
     <p class="kicker">DROP admin</p>
     <h1>Waitlist admin</h1>
     <form id="gate-form" novalidate>
@@ -31,7 +33,7 @@
 
   <nav class="sidebar" aria-label="Primary">
     <div class="brand">
-      <span class="logo-mark">◧</span>
+      <span class="logo-mark" aria-hidden="true"></span>
       <span class="wordmark">DROP</span>
     </div>
     <p class="kicker">Admin</p>
@@ -40,6 +42,9 @@
     </a>
     <a href="#/emails" class="nav-item" data-route="emails">Emails</a>
     <a href="#/settings" class="nav-item" data-route="settings">Settings</a>
+    <button id="theme-toggle" class="nav-item nav-theme" type="button">
+      <span class="theme-icon" aria-hidden="true"></span> Theme
+    </button>
     <button id="logout-btn" class="nav-item nav-logout" type="button">Logout</button>
   </nav>
 

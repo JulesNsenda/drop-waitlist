@@ -1,72 +1,137 @@
-/* Shared design tokens and base styles used by all pages. */
+/* Shared DROP design system — tokens, fonts, and base styles used by all
+   pages. Sourced from the "DROP Platform Design" Claude Design project.
+   Dark is the default; light theme via <html data-theme="light">. */
 
-:root {
-  color-scheme: dark;
-
-  /* palette */
-  --bg:            #0a0a0f;
-  --surface:       #111118;
-  --surface-2:     #191922;
-  --border:        #1f2937;
-  --border-subtle: #1a1a22;
-  --border-hover:  #383849;
-  --text:          #e5e7eb;
-  --text-muted:    #9ca3af;
-  --text-dim:      #7b8394;
-  --brand:         #4f46e5;
-  --brand-hover:   #6366f1;
-  --focus:         #6366f1;
-  --green:         #34d399;
-  --red:           #f87171;
-  --yellow:        #f59e0b;
-
-  /* layout */
-  --radius: 10px;
-}
-
-*, *::before, *::after {
-  box-sizing: border-box;
-}
-
-/* Self-hosted Inter Variable (no CDN fetch) */
+/* ── Self-hosted fonts (no CDN fetch) ─────────────────────────────────── */
 @font-face {
-  font-family: 'Inter';
-  src: url('/ui/inter-var.woff2') format('woff2');
+  font-family: 'JetBrains Mono';
+  src: url('/ui/jetbrains-mono-var.woff2') format('woff2');
+  font-weight: 100 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Hanken Grotesk';
+  src: url('/ui/hanken-grotesk-var.woff2') format('woff2');
   font-weight: 100 900;
   font-style: normal;
   font-display: swap;
 }
 
-html {
-  background: var(--bg);
+/* ── Design tokens ────────────────────────────────────────────────────── */
+:root {
+  color-scheme: dark;
+  --bg: #0B0E14;
+  --bg-2: #0F131C;
+  --bg-3: #151B27;
+  --panel: #11161F;
+  --border: #232C3D;
+  --text: #E7EBF3;
+  --text-2: #9AA6B8;
+  --text-3: #616D82;
+  --accent: #2E9BFE;
+  --accent-2: #66C0FF;
+  --accent-ink: #04121F;
+  --accent-soft: rgba(46, 155, 254, 0.12);
+  --ok: #39D98A;
+  --warn: #FEBC2E;
+  --err: #FF5F57;
+  --mono: 'JetBrains Mono', ui-monospace, monospace;
+  --sans: 'Hanken Grotesk', system-ui, sans-serif;
 }
 
-body {
+html[data-theme="light"] {
+  color-scheme: light;
+  --bg: #FBFCFE;
+  --bg-2: #F2F5F9;
+  --bg-3: #FFFFFF;
+  --panel: #FFFFFF;
+  --border: #E3E8F0;
+  --text: #0B1220;
+  --text-2: #4C596C;
+  --text-3: #8A97A9;
+  --accent: #0A84E0;
+  --accent-2: #2E9BFE;
+  --accent-ink: #FFFFFF;
+  --accent-soft: rgba(10, 132, 224, 0.08);
+  --ok: #12A150;
+  --warn: #C77700;
+  --err: #E5484D;
+}
+
+/* ── Base ─────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
   margin: 0;
-  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
   background: var(--bg);
   color: var(--text);
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.5;
 }
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { color: var(--accent-2); }
+
+input, textarea, select, button { font-family: inherit; }
+
+::selection { background: var(--accent); color: var(--accent-ink); }
+::placeholder { color: var(--text-3); opacity: 1; }
+
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 6px; }
 
 /* Keyboard focus ring, shared by every interactive element */
-:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Elements hidden via the `hidden` attribute must stay hidden even when a
+   class gives them a display value. */
+[hidden] { display: none !important; }
+
+/* The brand mark — a rotated drop shape, sized per use site. */
+.drop-mark {
+  display: block;
+  width: 18px;
+  height: 18px;
+  background: var(--accent);
+  border-radius: 50% 50% 50% 2px;
+  transform: rotate(45deg);
 }
 
-::placeholder {
-  color: var(--text-muted);
-  opacity: 1;
+/* Theme toggle: moon in dark mode (inset shadow), sun in light (dot + rays). */
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--text);
+  padding: 0;
 }
 
-::selection {
-  background: var(--brand);
-  color: #fff;
+.theme-icon {
+  display: block;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  box-shadow: inset -5px -4px 0 0 var(--text);
 }
 
-/* Input hover affordance */
-input:hover, textarea:hover, select:hover {
-  border-color: var(--border-hover);
+html[data-theme="light"] .theme-icon {
+  width: 9px;
+  height: 9px;
+  background: var(--text);
+  box-shadow:
+    0 -8px 0 -3px var(--text), 0 8px 0 -3px var(--text),
+    -8px 0 0 -3px var(--text), 8px 0 0 -3px var(--text),
+    6px 6px 0 -3px var(--text), -6px -6px 0 -3px var(--text),
+    6px -6px 0 -3px var(--text), -6px 6px 0 -3px var(--text);
 }
 
 /* Visually hide content while keeping it available to screen readers */
@@ -80,11 +145,11 @@ input:hover, textarea:hover, select:hover {
 }
 
 /* Shared status colours */
-.ok   { color: var(--green); }
-.err  { color: var(--red); }
-.warn { color: var(--yellow); }
+.ok   { color: var(--ok); }
+.err  { color: var(--err); }
+.warn { color: var(--warn); }
 
-/* Respect reduced-motion preference across both pages */
+/* Respect reduced-motion preference across all pages */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: .01ms !important;
