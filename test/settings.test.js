@@ -30,7 +30,7 @@ after(() => {
 // baseline on every freshModules() call (below) so one test's override (e.g.
 // RESEND_API_KEY: 'test-key') can never leak into a later test that doesn't
 // ask for it, regardless of execution order.
-const ENV_KEYS_UNDER_TEST = ['RESEND_API_KEY', 'WAITLIST_INVITES_ENABLED'];
+const ENV_KEYS_UNDER_TEST = ['RESEND_API_KEY', 'WAITLIST_INVITES_ENABLED', 'DROP_ADMIN_API_KEY'];
 
 // Sets env, drops the require cache for config/store/settings, and re-requires
 // them fresh. `seed`, if given, is written as waitlist.json before requiring
@@ -339,6 +339,183 @@ test('validateInvitesEnabled: accepts booleans, rejects everything else', async 
   assert.equal(settings.validateInvitesEnabled(null).ok, false);
 });
 
+// ── validateDropAdminKey ─────────────────────────────────────────────────────────
+
+test('validateDropAdminKey: rejects non-string, empty, and whitespace-only', async () => {
+  const { settings } = freshModules();
+  assert.equal(settings.validateDropAdminKey(42).ok, false);
+  assert.equal(settings.validateDropAdminKey(null).ok, false);
+  assert.equal(settings.validateDropAdminKey(undefined).ok, false);
+  assert.equal(settings.validateDropAdminKey({}).ok, false);
+  assert.equal(settings.validateDropAdminKey('').ok, false);
+  assert.equal(settings.validateDropAdminKey('   ').ok, false);
+});
+
+test('validateDropAdminKey: rejects a key exceeding the length cap', async () => {
+  const { settings } = freshModules();
+  const result = settings.validateDropAdminKey('a'.repeat(501));
+  assert.equal(result.ok, false);
+});
+
+test('validateDropAdminKey: rejects interior control characters', async () => {
+  const { settings } = freshModules();
+  // Interior, not leading/trailing — validateDropAdminKey trims first, so a
+  // control char at either end would be stripped by trim() and wrongly pass.
+  assert.equal(settings.validateDropAdminKey('abc\ndef').ok, false);
+  assert.equal(settings.validateDropAdminKey('abc\x01def').ok, false);
+  assert.equal(settings.validateDropAdminKey('abc\r\ndef').ok, false);
+});
+
+test('validateDropAdminKey: rejects non-ASCII characters', async () => {
+  const { settings } = freshModules();
+  assert.equal(settings.validateDropAdminKey('abc€def').ok, false);
+});
+
+test('validateDropAdminKey: rejects an inner space', async () => {
+  const { settings } = freshModules();
+  assert.equal(settings.validateDropAdminKey('abc def').ok, false);
+});
+
+test('validateDropAdminKey: accepts a normal printable-ASCII key', async () => {
+  const { settings } = freshModules();
+  const result = settings.validateDropAdminKey('DROPKEY-abc123XYZ_.~');
+  assert.equal(result.ok, true);
+  assert.equal(result.value, 'DROPKEY-abc123XYZ_.~');
+});
+
+test('validateDropAdminKey: trims surrounding whitespace', async () => {
+  const { settings } = freshModules();
+  const result = settings.validateDropAdminKey('  DROPKEY-abc123  ');
+  assert.equal(result.ok, true);
+  assert.equal(result.value, 'DROPKEY-abc123');
+});
+
+// ── getEffectiveDropAdminKey: precedence ─────────────────────────────────────────
+
+test('getEffectiveDropAdminKey: "" when neither a stored section nor env is set', async () => {
+  const { store, settings } = freshModules({ DROP_ADMIN_API_KEY: undefined });
+  await store.loadStore();
+  assert.equal(settings.getEffectiveDropAdminKey(), '');
+});
+
+test('getEffectiveDropAdminKey: env fallback used when no section is stored', async () => {
+  const { store, settings } = freshModules({ DROP_ADMIN_API_KEY: 'env-key-123' });
+  await store.loadStore();
+  assert.equal(settings.getEffectiveDropAdminKey(), 'env-key-123');
+});
+
+test('getEffectiveDropAdminKey: UI-saved key wins over env', async () => {
+  const { store, settings } = freshModules({ DROP_ADMIN_API_KEY: 'env-key-123' });
+  await store.loadStore();
+  const validated = settings.validateDropAdminKey('ui-key-456');
+  assert.equal(validated.ok, true);
+  await store.setSettingsSection('dropAdminKey', validated.value);
+  assert.equal(settings.getEffectiveDropAdminKey(), 'ui-key-456');
+});
+
+test('getEffectiveDropAdminKey: corrupt stored sections fall back to env', async () => {
+  const base = { entries: [], templates: {} };
+
+  const emptyObj = freshModules({ DROP_ADMIN_API_KEY: 'env-key-123' }, { ...base, settings: { dropAdminKey: {} } });
+  await emptyObj.store.loadStore();
+  assert.equal(emptyObj.settings.getEffectiveDropAdminKey(), 'env-key-123');
+
+  const numericValue = freshModules(
+    { DROP_ADMIN_API_KEY: 'env-key-123' },
+    { ...base, settings: { dropAdminKey: { value: 42 } } }
+  );
+  await numericValue.store.loadStore();
+  assert.equal(numericValue.settings.getEffectiveDropAdminKey(), 'env-key-123');
+
+  const bareString = freshModules({ DROP_ADMIN_API_KEY: 'env-key-123' }, { ...base, settings: { dropAdminKey: 'a-string' } });
+  await bareString.store.loadStore();
+  assert.equal(bareString.settings.getEffectiveDropAdminKey(), 'env-key-123');
+});
+
+// ── buildInvitesView: dropKeySavedAt / dropKeyEnvSet ─────────────────────────────
+
+test('buildInvitesView: dropKeySavedAt null and dropKeyEnvSet false when nothing set', async () => {
+  const { store, settings } = freshModules({ DROP_ADMIN_API_KEY: undefined });
+  await store.loadStore();
+  const view = settings.buildInvitesView();
+  assert.equal(view.dropKeySavedAt, null);
+  assert.equal(view.dropKeyEnvSet, false);
+});
+
+test('buildInvitesView: dropKeyEnvSet true when env var is set', async () => {
+  const { store, settings } = freshModules({ DROP_ADMIN_API_KEY: 'env-key-123' });
+  await store.loadStore();
+  assert.equal(settings.buildInvitesView().dropKeyEnvSet, true);
+});
+
+test('buildInvitesView: dropKeySavedAt is an ISO string once a key is saved via UI', async () => {
+  const { store, settings } = freshModules({ DROP_ADMIN_API_KEY: undefined });
+  await store.loadStore();
+  const validated = settings.validateDropAdminKey('ui-key-456');
+  assert.equal(validated.ok, true);
+  await store.setSettingsSection('dropAdminKey', validated.value);
+  const view = settings.buildInvitesView();
+  assert.equal(typeof view.dropKeySavedAt, 'string');
+  assert.ok(!Number.isNaN(new Date(view.dropKeySavedAt).getTime()), 'dropKeySavedAt should be a valid ISO date string');
+});
+
+test('buildInvitesView: dropKeySavedAt stays null for a corrupt section even if it carries a stale savedAt', async () => {
+  // Provenance must derive from whether the key actually resolves (effective
+  // getter), never from bare section existence — a corrupt section with a
+  // leftover savedAt must NOT be reported as "saved via UI".
+  const { store, settings } = freshModules(
+    { DROP_ADMIN_API_KEY: undefined },
+    { entries: [], templates: {}, settings: { dropAdminKey: { value: 42, savedAt: '2020-01-01T00:00:00.000Z' } } }
+  );
+  await store.loadStore();
+  assert.equal(settings.buildInvitesView().dropKeySavedAt, null);
+});
+
+test('buildInvitesView: does not expose "dropKeyConfigured" (retired field name)', async () => {
+  const { store, settings } = freshModules();
+  await store.loadStore();
+  const view = settings.buildInvitesView();
+  assert.equal(Object.prototype.hasOwnProperty.call(view, 'dropKeyConfigured'), false);
+});
+
+test('buildInvitesView: never contains the drop admin key material', async () => {
+  const { store, settings } = freshModules({ DROP_ADMIN_API_KEY: undefined });
+  await store.loadStore();
+  const SECRET = 'DROPKEY-VIEW-LEAK-CHECK';
+  const validated = settings.validateDropAdminKey(SECRET);
+  assert.equal(validated.ok, true);
+  await store.setSettingsSection('dropAdminKey', validated.value);
+  const view = settings.buildInvitesView();
+  assert.ok(!JSON.stringify(view).includes(SECRET), 'buildInvitesView leaked the drop admin key');
+});
+
+// ── dropAdminKey: store-level save/reset roundtrip ───────────────────────────────
+
+test('store: setSettingsSection wraps dropAdminKey as {value, savedAt}', async () => {
+  const { store } = freshModules();
+  await store.loadStore();
+  await store.setSettingsSection('dropAdminKey', 'a-valid-key-123');
+  const stored = store.getSettings().dropAdminKey;
+  assert.equal(stored.value, 'a-valid-key-123');
+  assert.equal(typeof stored.savedAt, 'string');
+});
+
+test('dropAdminKey: save/reset roundtrip — validated key wins over env, reset falls back to env', async () => {
+  const { store, settings } = freshModules({ DROP_ADMIN_API_KEY: 'env-fallback-key' });
+  await store.loadStore();
+  assert.equal(settings.getEffectiveDropAdminKey(), 'env-fallback-key');
+
+  const validated = settings.validateDropAdminKey('  UI-Saved-Key-123  ');
+  assert.equal(validated.ok, true);
+  assert.equal(validated.value, 'UI-Saved-Key-123');
+  await store.setSettingsSection('dropAdminKey', validated.value);
+  assert.equal(settings.getEffectiveDropAdminKey(), 'UI-Saved-Key-123');
+
+  await store.resetSettingsSection('dropAdminKey');
+  assert.equal(store.getSettings().dropAdminKey, undefined);
+  assert.equal(settings.getEffectiveDropAdminKey(), 'env-fallback-key');
+});
+
 // ── isEmailConfigured (provider-aware "usable" check) ────────────────────────────
 
 test('isEmailConfigured: false for provider none', async () => {
@@ -391,11 +568,12 @@ test('buildEmailView: includes security, reflecting the saved mode', async () =>
 
 // ── no-leak: the password must never surface in a view/response object ──────────
 
-test('no-leak: password never appears in any view or simulated API response', async () => {
-  const { store, settings } = freshModules();
+test('no-leak: password and drop admin key never appear in any view or simulated API response', async () => {
+  const { store, settings } = freshModules({ DROP_ADMIN_API_KEY: undefined });
   await store.loadStore();
 
   const SECRET = 'sUp3r-Leaky-Secret!!';
+  const DROP_KEY_SECRET = 'DROPKEY-SECRET-x7';
   const saved = settings.validateEmailSection({
     provider: 'smtp', from: 'DROP <hello@drop.dev>',
     smtp: { host: 'smtp.hostinger.com', username: 'hello@drop.dev', password: SECRET },
@@ -404,18 +582,26 @@ test('no-leak: password never appears in any view or simulated API response', as
   await store.setSettingsSection('email', saved.value);
   await store.setSettingsSection('invitesEnabled', true);
 
+  const validatedKey = settings.validateDropAdminKey(DROP_KEY_SECRET);
+  assert.equal(validatedKey.ok, true);
+  await store.setSettingsSection('dropAdminKey', validatedKey.value);
+
   const emailView = settings.buildEmailView();
   const invitesView = settings.buildInvitesView();
 
   assert.ok(!JSON.stringify(emailView).includes(SECRET), 'emailView leaked the password');
   assert.ok(!JSON.stringify(invitesView).includes(SECRET), 'invitesView leaked the password');
+  assert.ok(!JSON.stringify(invitesView).includes(DROP_KEY_SECRET), 'invitesView leaked the drop admin key');
   assert.equal(emailView.smtp.hasPassword, true);
   assert.equal(emailView.smtp.password, undefined);
+  assert.equal(invitesView.dropKeyConfigured, undefined, 'retired field must not linger');
 
-  // The effective getter is internal (used only to actually send mail) and is
-  // expected to carry the real password — it must never be spread into a view.
+  // The effective getters are internal (used only to actually send mail /
+  // authenticate against DROP) and are expected to carry the real secrets —
+  // they must never be spread into a view.
   const effective = settings.getEffectiveEmailSettings();
   assert.equal(effective.smtp.password, SECRET);
+  assert.equal(settings.getEffectiveDropAdminKey(), DROP_KEY_SECRET);
 
   // Simulate the full GET /api/admin/settings payload shape and re-check there.
   const fullResponse = {
@@ -432,6 +618,7 @@ test('no-leak: password never appears in any view or simulated API response', as
     resendKeyConfigured: false,
   };
   assert.ok(!JSON.stringify(fullResponse).includes(SECRET), 'full settings response leaked the password');
+  assert.ok(!JSON.stringify(fullResponse).includes(DROP_KEY_SECRET), 'full settings response leaked the drop admin key');
 });
 
 // ── store.js: settings persistence, normalization, at-rest permissions ──────────

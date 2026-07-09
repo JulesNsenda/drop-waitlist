@@ -1,10 +1,11 @@
 'use strict';
 
-const { EMAIL_RE, DROP_ADMIN_API_KEY, RESEND_API_KEY, WAITLIST_JOIN_LIMIT, WAITLIST_JOIN_WINDOW_MS } = require('./config');
+const { EMAIL_RE, RESEND_API_KEY, WAITLIST_JOIN_LIMIT, WAITLIST_JOIN_WINDOW_MS } = require('./config');
 const { normEmail, getEntries, findByEmail, findById, addEntry, save, getTemplates, setTemplate, resetTemplate, setSettingsSection, resetSettingsSection } = require('./store');
 const { sendConfirmationEmail, sendInviteEmail, sendEmail, getEffectiveTemplate, DEFAULT_TEMPLATES, escapeHtml } = require('./email');
 const {
-  getEffectiveEmailSettings, isInvitesEnabled, validateEmailSection, validateInvitesEnabled,
+  getEffectiveEmailSettings, isInvitesEnabled, getEffectiveDropAdminKey,
+  validateEmailSection, validateInvitesEnabled, validateDropAdminKey,
   buildEmailView, buildInvitesView, isEmailConfigured, hasControlChars,
 } = require('./settings');
 const { provisionAccount } = require('./drop-api');
@@ -87,8 +88,8 @@ async function handleApprove(req, res) {
     });
   }
 
-  if (!DROP_ADMIN_API_KEY) {
-    return sendJson(res, 500, { ok: false, error: 'DROP_ADMIN_API_KEY not configured.' });
+  if (!getEffectiveDropAdminKey()) {
+    return sendJson(res, 500, { ok: false, error: 'No DROP admin key configured. Save one in Settings or set DROP_ADMIN_API_KEY.' });
   }
 
   const result = await provisionAccount(entry.email);
@@ -131,31 +132,57 @@ function handleGetSettings(res) {
   });
 }
 
-// Partial save: `{ email?, invitesEnabled? }`. One validator per present key;
-// only present keys are validated/saved, and only their fresh views returned.
+// Partial save: `{ email?, invitesEnabled?, dropAdminKey? }`. One validator
+// per present key. All present sections are validated first and only then
+// persisted, so an invalid later section can't leave an earlier one
+// half-saved; fresh views are built after the persist phase.
 async function handleSaveSettings(req, res) {
   const body = await readJsonBody(req);
   if (!body || typeof body !== 'object') return sendJson(res, 400, { ok: false, error: 'Invalid JSON.' });
 
   const hasEmail = Object.prototype.hasOwnProperty.call(body, 'email');
   const hasInvites = Object.prototype.hasOwnProperty.call(body, 'invitesEnabled');
-  if (!hasEmail && !hasInvites) {
+  const hasDropKey = Object.prototype.hasOwnProperty.call(body, 'dropAdminKey');
+  if (!hasEmail && !hasInvites && !hasDropKey) {
     return sendJson(res, 400, { ok: false, error: 'No settings provided.' });
   }
 
-  const response = { ok: true };
+  let emailValue, invitesValue, dropKeyValue;
 
   if (hasEmail) {
     const result = validateEmailSection(body.email);
     if (!result.ok) return sendJson(res, 400, { ok: false, error: result.error });
-    await setSettingsSection('email', result.value);
-    response.email = buildEmailView();
+    emailValue = result.value;
   }
 
   if (hasInvites) {
     const result = validateInvitesEnabled(body.invitesEnabled);
     if (!result.ok) return sendJson(res, 400, { ok: false, error: result.error });
-    await setSettingsSection('invitesEnabled', result.value);
+    invitesValue = result.value;
+  }
+
+  if (hasDropKey) {
+    const result = validateDropAdminKey(body.dropAdminKey);
+    if (!result.ok) return sendJson(res, 400, { ok: false, error: result.error });
+    dropKeyValue = result.value;
+  }
+
+  const response = { ok: true };
+
+  if (hasEmail) {
+    await setSettingsSection('email', emailValue);
+    response.email = buildEmailView();
+  }
+
+  if (hasInvites) {
+    await setSettingsSection('invitesEnabled', invitesValue);
+  }
+
+  if (hasDropKey) {
+    await setSettingsSection('dropAdminKey', dropKeyValue);
+  }
+
+  if (hasInvites || hasDropKey) {
     response.invites = buildInvitesView();
   }
 
@@ -163,12 +190,17 @@ async function handleSaveSettings(req, res) {
 }
 
 // Deletes a settings section so env/defaults apply again (templates-reset
-// pattern). Only 'email' is resettable — invitesEnabled is a plain toggle.
+// pattern). 'email' and 'dropAdminKey' are resettable — invitesEnabled is a
+// plain toggle.
 async function handleResetSettings(req, res) {
   const body = await readJsonBody(req);
   const section = body && body.section;
-  if (section !== 'email') {
-    return sendJson(res, 400, { ok: false, error: 'section must be "email".' });
+  if (section !== 'email' && section !== 'dropAdminKey') {
+    return sendJson(res, 400, { ok: false, error: 'section must be "email" or "dropAdminKey".' });
+  }
+  if (section === 'dropAdminKey') {
+    await resetSettingsSection('dropAdminKey');
+    return sendJson(res, 200, { ok: true, invites: buildInvitesView() });
   }
   await resetSettingsSection('email');
   return sendJson(res, 200, { ok: true, email: buildEmailView() });

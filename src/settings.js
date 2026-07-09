@@ -7,11 +7,13 @@ const { getSettings } = require('./store');
 // getters (templates pattern — no boot-time seeding, no provenance
 // tracking), and allowlisted API view builders.
 //
-// INVARIANT: the settings object (and anything holding a real password, e.g.
-// getEffectiveEmailSettings()'s return value) must NEVER be spread or
-// serialized into an API response, a log line, or a CSV. View builders below
-// construct their output field-by-field from an explicit allowlist for
-// exactly this reason — `hasPassword` is a boolean, never the password.
+// INVARIANT: the settings object (and anything holding a real secret, e.g.
+// getEffectiveEmailSettings()'s return value or getEffectiveDropAdminKey()'s
+// return value) must NEVER be spread or serialized into an API response, a
+// log line, or a CSV. View builders below construct their output
+// field-by-field from an explicit allowlist for exactly this reason —
+// `hasPassword` is a boolean, never the password; the DROP admin key never
+// appears in a view at all.
 
 const MAX_ADDR_LEN = 320; // email / username-as-address fields
 const MAX_HOST_LEN = 253;
@@ -26,6 +28,11 @@ function hasControlChars(s) {
 
 const HOSTNAME_RE = /^[a-zA-Z0-9.-]+$/;
 const FROM_ADDR_RE = /^(.*)<([^<>]+)>\s*$/;
+
+// Printable ASCII, no spaces — the DROP admin key goes raw into an
+// Authorization header, and Node's fetch embeds the full header value in a
+// thrown TypeError on any non-ByteString character.
+const PRINTABLE_ASCII_RE = /^[\x21-\x7e]+$/;
 
 // Extracts the bare address out of "Name <addr>" or a bare address string —
 // deliberately simple (no RFC 5322 parser), matching smtp.js's own parsing.
@@ -65,6 +72,14 @@ function isInvitesEnabled() {
     return stored.value;
   }
   return INVITES_ENABLED;
+}
+
+function getEffectiveDropAdminKey() {
+  const stored = getSettings().dropAdminKey;
+  if (stored && typeof stored === 'object' && typeof stored.value === 'string' && stored.value) {
+    return stored.value;
+  }
+  return DROP_ADMIN_API_KEY;
 }
 
 // ── validation ──────────────────────────────────────────────────────────────
@@ -156,6 +171,17 @@ function validateInvitesEnabled(value) {
   return { ok: true, value };
 }
 
+function validateDropAdminKey(value) {
+  if (typeof value !== 'string') return { ok: false, error: 'dropAdminKey must be a string' };
+  const trimmed = value.trim();
+  if (!trimmed) return { ok: false, error: 'dropAdminKey must not be empty' };
+  if (trimmed.length > MAX_PASSWORD_LEN) return { ok: false, error: `dropAdminKey must be ${MAX_PASSWORD_LEN} characters or fewer` };
+  if (!PRINTABLE_ASCII_RE.test(trimmed)) {
+    return { ok: false, error: 'dropAdminKey must contain only printable ASCII characters (no spaces)' };
+  }
+  return { ok: true, value: trimmed };
+}
+
 // ── allowlisted API views — never spread the settings object (see INVARIANT) ──
 
 function buildEmailView() {
@@ -177,10 +203,13 @@ function buildEmailView() {
 
 function buildInvitesView() {
   const stored = getSettings().invitesEnabled;
+  const storedKey = getSettings().dropAdminKey;
+  const dropKeySaved = storedKey && typeof storedKey === 'object' && typeof storedKey.value === 'string' && storedKey.value;
   return {
     enabled: isInvitesEnabled(),
     savedAt: (stored && typeof stored === 'object' && stored.savedAt) || null,
-    dropKeyConfigured: !!DROP_ADMIN_API_KEY,
+    dropKeySavedAt: (dropKeySaved && storedKey.savedAt) || null,
+    dropKeyEnvSet: !!DROP_ADMIN_API_KEY,
   };
 }
 
@@ -197,8 +226,10 @@ function isEmailConfigured() {
 module.exports = {
   getEffectiveEmailSettings,
   isInvitesEnabled,
+  getEffectiveDropAdminKey,
   validateEmailSection,
   validateInvitesEnabled,
+  validateDropAdminKey,
   buildEmailView,
   buildInvitesView,
   isEmailConfigured,

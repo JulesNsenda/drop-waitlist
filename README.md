@@ -37,7 +37,7 @@ in Settings; a few are hard secrets that stay env-only forever.
 | `PORT` | auto | Injected by DROP. |
 | `DROP_DATA_DIR` | auto | Injected by DROP; `waitlist.json` (entries, templates, settings) is stored here (survives upgrades). |
 | `WAITLIST_ADMIN_TOKEN` | **yes** | Gate for `/admin`. Admin endpoints fail closed (403) if unset. Env-only — never readable or writable via Settings. |
-| `DROP_ADMIN_API_KEY` | for invites | A DROP **admin** API key (create one in the dashboard) used to create beta accounts. Env-only. |
+| `DROP_ADMIN_API_KEY` | for invites | A DROP **admin** API key (create one in the dashboard) used to create beta accounts. Fallback used until a key is saved in the admin UI → Settings (Invites card), where a saved key wins. Write-only there — never readable via Settings or any API response. |
 | `DROP_API_URL` | no | DROP API base (default `http://127.0.0.1:3000`). Use the host gateway under Docker isolation. |
 | `DASHBOARD_URL` | no | Base for the dashboard link in the welcome email (defaults to `DROP_API_URL`). |
 | `RESEND_API_KEY` | for Resend | [Resend](https://resend.com) API key. Env-only — set it, then pick "Resend" as the provider in Settings. |
@@ -65,7 +65,10 @@ isolation (`DROP_ISOLATION=docker`) on the server first**, then enable invites
 (admin UI → Settings, or set `WAITLIST_INVITES_ENABLED=true` before the first
 save touches that toggle). Until then, leave invites off — you can still
 collect signups and approve (mark) people; no accounts are minted. Settings
-also shows a persistent warning if `DROP_ADMIN_API_KEY` isn't configured yet.
+also shows a persistent warning if no DROP admin key is configured yet (env
+var or a key saved in Settings). Rotating the key means updating both the env
+var and any value saved in Settings — old copies/backups of `waitlist.json`
+still contain the previous key.
 
 ## Endpoints
 - `GET /` — landing page

@@ -102,6 +102,11 @@
   const invitesToggleText = document.getElementById('invites-toggle-text');
   const invitesMetaEl     = document.getElementById('meta-invites');
   const dropKeyWarning    = document.getElementById('drop-key-warning');
+  const dropKeyStatusEl   = document.getElementById('drop-key-status');
+  const dropKeyInput      = document.getElementById('drop-key-input');
+  const saveDropKeyBtn    = document.getElementById('save-drop-key');
+  const resetDropKeyBtn   = document.getElementById('reset-drop-key');
+  const dropKeyMsgEl      = document.getElementById('drop-key-msg');
   const envDropKeyEl      = document.getElementById('env-drop-key');
   const envResendKeyEl    = document.getElementById('env-resend-key');
 
@@ -902,14 +907,38 @@
     invitesMetaEl.textContent = inv.savedAt
       ? 'Last saved: ' + fmtDateTimeSafe(inv.savedAt)
       : 'Using server env/defaults.';
-    dropKeyWarning.hidden = inv.dropKeyConfigured;
+
+    const configured = !!(inv.dropKeySavedAt || inv.dropKeyEnvSet);
+    dropKeyWarning.hidden = configured;
+
+    if (inv.dropKeySavedAt) {
+      dropKeyStatusEl.textContent = 'Configured via UI · saved ' + fmtDateTimeSafe(inv.dropKeySavedAt);
+      dropKeyStatusEl.className = 'static-value ok';
+    } else if (inv.dropKeyEnvSet) {
+      dropKeyStatusEl.textContent = 'Using env var';
+      dropKeyStatusEl.className = 'static-value ok';
+    } else {
+      dropKeyStatusEl.textContent = 'Not set';
+      dropKeyStatusEl.className = 'static-value warn';
+    }
+    // Never touch dropKeyInput.value here — a re-render triggered by an
+    // unrelated save (email, invites toggle) must not wipe a typed key.
+    dropKeyInput.placeholder = inv.dropKeySavedAt ? '(unchanged)' : '(not set)';
   }
 
   function renderEnvCard() {
     const s = state.settings;
-    const dropOk = s.invites.dropKeyConfigured;
-    envDropKeyEl.textContent = dropOk ? 'Configured ✓' : 'Not set ✗';
-    envDropKeyEl.className = dropOk ? 'ok' : 'err';
+    const inv = s.invites;
+    if (inv.dropKeyEnvSet) {
+      envDropKeyEl.textContent = 'Configured ✓';
+      envDropKeyEl.className = 'ok';
+    } else if (inv.dropKeySavedAt) {
+      envDropKeyEl.textContent = 'Not set — using key saved in Settings';
+      envDropKeyEl.className = 'warn';
+    } else {
+      envDropKeyEl.textContent = 'Not set ✗';
+      envDropKeyEl.className = 'err';
+    }
     const resendOk = s.resendKeyConfigured;
     envResendKeyEl.textContent = resendOk ? 'Configured ✓' : 'Not set ✗';
     envResendKeyEl.className = resendOk ? 'ok' : 'err';
@@ -1054,6 +1083,67 @@
     }
   }
 
+  async function handleSaveDropKey() {
+    const value = dropKeyInput.value;
+    if (!value) {
+      showInlineMsg(dropKeyMsgEl, 'Enter a key first.', true);
+      return;
+    }
+
+    saveDropKeyBtn.disabled = true;
+    saveDropKeyBtn.textContent = 'Saving…';
+    try {
+      const result = await api('/api/admin/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dropAdminKey: value }),
+      });
+      if (!result.ok) {
+        showInlineMsg(dropKeyMsgEl, result.error || 'Save failed.', true);
+      } else {
+        state.settings.invites = result.invites;
+        dropKeyInput.value = '';
+        renderInvitesCard();
+        renderEnvCard();
+        showInlineMsg(dropKeyMsgEl, 'Key saved.', false);
+      }
+    } catch (err) {
+      if (err !== SENTINEL_ABORT) showInlineMsg(dropKeyMsgEl, err.message || 'Save failed — network error.', true);
+    } finally {
+      saveDropKeyBtn.disabled = false;
+      saveDropKeyBtn.textContent = 'Save';
+    }
+  }
+
+  async function handleResetDropKey() {
+    const proceed = await confirmDialog(
+      'Remove the key saved in Settings? The DROP_ADMIN_API_KEY env var (if set) will apply again.', 'Reset'
+    );
+    if (!proceed) return;
+
+    resetDropKeyBtn.disabled = true;
+    try {
+      const result = await api('/api/admin/settings/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ section: 'dropAdminKey' }),
+      });
+      if (!result.ok) {
+        showInlineMsg(dropKeyMsgEl, result.error || 'Reset failed.', true);
+      } else {
+        state.settings.invites = result.invites;
+        dropKeyInput.value = '';
+        renderInvitesCard();
+        renderEnvCard();
+        showInlineMsg(dropKeyMsgEl, 'Reverted to environment.', false);
+      }
+    } catch (err) {
+      if (err !== SENTINEL_ABORT) showInlineMsg(dropKeyMsgEl, err.message || 'Reset failed — network error.', true);
+    } finally {
+      resetDropKeyBtn.disabled = false; // every exit path, including the 403-sentinel abort
+    }
+  }
+
   function wireSettingsView() {
     providerSelect.addEventListener('change', () => {
       markEmailSettingsDirty();
@@ -1074,6 +1164,8 @@
     resetEmailBtn.addEventListener('click', handleResetEmailSettings);
     testEmailBtn.addEventListener('click', handleSendTestEmail);
     invitesToggle.addEventListener('change', handleInvitesToggle);
+    saveDropKeyBtn.addEventListener('click', handleSaveDropKey);
+    resetDropKeyBtn.addEventListener('click', handleResetDropKey);
   }
 
   // ── wire up ────────────────────────────────────────────────────────────────

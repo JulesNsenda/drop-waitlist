@@ -13,6 +13,10 @@ const INVITES_ENABLED = process.env.WAITLIST_INVITES_ENABLED === 'true';
 const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
 const EMAIL_FROM = process.env.EMAIL_FROM || 'DROP <onboarding@resend.dev>';
 
+// MUST stay env-only: the DROP admin key below is UI-configurable, and a
+// UI-settable URL next to it would let an admin-token holder exfiltrate the
+// key by redirecting provisioning (which sends the key as a Bearer header)
+// to a host they control.
 const DROP_API_URL = (process.env.DROP_API_URL || 'http://127.0.0.1:3000').replace(/\/$/, '');
 const DROP_ADMIN_API_KEY = process.env.DROP_ADMIN_API_KEY || '';
 const DASHBOARD_URL = (process.env.DASHBOARD_URL || DROP_API_URL).replace(/\/$/, '') + '/dashboard';

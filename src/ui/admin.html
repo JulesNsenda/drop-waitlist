@@ -227,7 +227,7 @@
             </div>
             <div class="field">
               <label for="smtp-password">Password</label>
-              <input type="password" id="smtp-password" autocomplete="off">
+              <input type="password" id="smtp-password" autocomplete="new-password">
             </div>
           </div>
           <div class="field">
@@ -281,20 +281,34 @@
         </div>
         <div class="editor-meta" id="meta-invites"></div>
         <div class="note" id="drop-key-warning" hidden>
-          DROP_ADMIN_API_KEY is not set — approvals will fail until it is configured
-          in the environment.
+          No DROP admin key is configured — approvals will fail while invites are
+          enabled. Save a key below or set DROP_ADMIN_API_KEY.
         </div>
         <label class="switch-row">
           <input type="checkbox" id="invites-toggle">
           <span class="switch-text" id="invites-toggle-text"></span>
         </label>
+
+        <div class="field">
+          <label>DROP admin key</label>
+          <span class="static-value" id="drop-key-status"></span>
+        </div>
+        <div class="field">
+          <label for="drop-key-input">Key</label>
+          <input type="password" id="drop-key-input" autocomplete="new-password">
+        </div>
+        <div class="editor-actions">
+          <button id="save-drop-key" type="button">Save</button>
+          <button class="btn-ghost btn-danger" id="reset-drop-key" type="button">Reset to env…</button>
+          <span class="save-msg" id="drop-key-msg" aria-live="polite"></span>
+        </div>
       </div>
 
       <!-- Environment (read-only) -->
       <div class="editor-card">
         <div class="editor-head">
           <h2>Environment</h2>
-          <p class="editor-sub">Secrets stay in the server environment — read-only here.</p>
+          <p class="editor-sub">Environment status — read-only here.</p>
         </div>
         <div class="env-grid">
           <span class="env-label">Admin token</span>
@@ -302,7 +316,7 @@
           <span class="env-hint">Set via WAITLIST_ADMIN_TOKEN in the server environment.</span>
           <span class="env-label">DROP admin API key</span>
           <span id="env-drop-key"></span>
-          <span class="env-hint">Set via DROP_ADMIN_API_KEY — required for approvals to provision accounts.</span>
+          <span class="env-hint">Set via DROP_ADMIN_API_KEY, or save one in Settings above.</span>
           <span class="env-label">Resend API key</span>
           <span id="env-resend-key"></span>
           <span class="env-hint">Set via RESEND_API_KEY — used when the email provider is Resend.</span>
