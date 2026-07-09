@@ -84,6 +84,7 @@
   const resendKeyStatusEl   = document.getElementById('resend-key-status');
   const smtpHostInput       = document.getElementById('smtp-host');
   const smtpPortInput       = document.getElementById('smtp-port');
+  const smtpSecuritySelect  = document.getElementById('smtp-security');
   const smtpUsernameInput   = document.getElementById('smtp-username');
   const smtpPasswordInput   = document.getElementById('smtp-password');
   const fromNameInput       = document.getElementById('from-name');
@@ -814,6 +815,13 @@
     return name ? name + ' <' + address + '>' : address;
   }
 
+  // Conventional submission port per encryption mode: SSL/TLS (implicit) →
+  // 465, STARTTLS → 587. Used to render a fallback and to auto-fill the port
+  // when the mode changes while the port still holds the other mode's default.
+  function defaultPortFor(security) {
+    return security === 'starttls' ? 587 : 465;
+  }
+
   // Mirrors the server's provider-aware "email is usable" rule so banners
   // update immediately after a save; the next loadAll re-syncs regardless.
   function computeEmailConfigured(s) {
@@ -859,7 +867,8 @@
 
     providerSelect.value = email.provider;
     smtpHostInput.value = email.smtp.host || '';
-    smtpPortInput.value = String(email.smtp.port || 465);
+    smtpSecuritySelect.value = email.smtp.security === 'starttls' ? 'starttls' : 'tls';
+    smtpPortInput.value = String(email.smtp.port || defaultPortFor(smtpSecuritySelect.value));
     smtpUsernameInput.value = email.smtp.username || '';
     smtpPasswordInput.value = ''; // write-only — never render the stored value
     smtpPasswordInput.placeholder = email.smtp.hasPassword ? '(unchanged)' : '(not set)';
@@ -908,6 +917,7 @@
 
   async function handleSaveEmailSettings() {
     const provider = providerSelect.value;
+    const security = smtpSecuritySelect.value === 'starttls' ? 'starttls' : 'tls';
     const port = Number(smtpPortInput.value);
     const portValid = Number.isInteger(port) && port >= 1 && port <= 65535;
     if (provider === 'smtp' && !portValid) {
@@ -917,7 +927,8 @@
 
     const smtp = {
       host: smtpHostInput.value.trim(),
-      port: portValid ? port : 465,
+      port: portValid ? port : defaultPortFor(security),
+      security: security,
       username: smtpUsernameInput.value.trim(),
     };
     if (smtpPasswordInput.value) smtp.password = smtpPasswordInput.value; // omitted = keep existing
@@ -1047,6 +1058,15 @@
     providerSelect.addEventListener('change', () => {
       markEmailSettingsDirty();
       updateProviderGroups();
+    });
+    smtpSecuritySelect.addEventListener('change', () => {
+      // Auto-fill the new mode's default port only when the port still holds
+      // the OTHER mode's default (465↔587) — a custom port is left alone.
+      const otherDefault = defaultPortFor(smtpSecuritySelect.value === 'starttls' ? 'tls' : 'starttls');
+      if (smtpPortInput.value.trim() === String(otherDefault)) {
+        smtpPortInput.value = String(defaultPortFor(smtpSecuritySelect.value));
+      }
+      markEmailSettingsDirty();
     });
     [smtpHostInput, smtpPortInput, smtpUsernameInput, smtpPasswordInput, fromNameInput, fromAddressInput]
       .forEach((el) => el.addEventListener('input', markEmailSettingsDirty));

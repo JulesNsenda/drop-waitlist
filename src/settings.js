@@ -46,7 +46,7 @@ function getEffectiveEmailSettings() {
       smtp: {
         host: smtp.host || '',
         port: smtp.port || 465,
-        security: 'tls',
+        security: smtp.security === 'starttls' ? 'starttls' : 'tls',
         username: smtp.username || '',
         password: smtp.password || '',
       },
@@ -107,17 +107,22 @@ function validateEmailSection(body) {
     return { ok: false, error: 'email.smtp.host contains invalid characters' };
   }
 
-  let port = 465;
+  // Security: 'tls' (implicit, default) or 'starttls'. Validated before the
+  // port default below so an omitted port can default per-mode (465 / 587).
+  let security = 'tls';
+  if (smtpBody.security !== undefined) {
+    if (smtpBody.security !== 'tls' && smtpBody.security !== 'starttls') {
+      return { ok: false, error: 'email.smtp.security must be "tls" or "starttls"' };
+    }
+    security = smtpBody.security;
+  }
+
+  let port = security === 'starttls' ? 587 : 465;
   if (smtpBody.port !== undefined && smtpBody.port !== null && smtpBody.port !== '') {
     port = Number(smtpBody.port);
     if (!Number.isInteger(port) || port < 1 || port > 65535) {
       return { ok: false, error: 'email.smtp.port must be an integer between 1 and 65535' };
     }
-  }
-
-  // STARTTLS/587 deferred — the API accepts only 'tls' (v1 spec).
-  if (smtpBody.security !== undefined && smtpBody.security !== 'tls') {
-    return { ok: false, error: 'email.smtp.security must be "tls"' };
   }
 
   const username = typeof smtpBody.username === 'string' ? smtpBody.username.trim() : '';
@@ -142,7 +147,7 @@ function validateEmailSection(body) {
     return { ok: false, error: 'email.smtp.password must be a string' };
   }
 
-  value.smtp = { host, port, security: 'tls', username, password };
+  value.smtp = { host, port, security, username, password };
   return { ok: true, value };
 }
 
@@ -162,6 +167,7 @@ function buildEmailView() {
     smtp: {
       host: effective.smtp.host,
       port: effective.smtp.port,
+      security: effective.smtp.security,
       username: effective.smtp.username,
       hasPassword: !!effective.smtp.password,
     },

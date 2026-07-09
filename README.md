@@ -44,9 +44,13 @@ in Settings; a few are hard secrets that stay env-only forever.
 | `EMAIL_FROM` | no | **Seed only.** Fallback from address used until a from is saved in Settings, e.g. `DROP <noreply@dropkit.sh>`. |
 | `WAITLIST_INVITES_ENABLED` | no | **Seed only, default off.** Fallback used until the invites toggle is saved once in Settings. While off, approving only marks entries `approved` and creates **no** accounts. |
 
-Email delivery has **no `SMTP_*` env vars at all** — the Hostinger (or any
-465/TLS) mailbox host, port, username, and password are entered in Settings
-and stored only in `waitlist.json` (written with `0600` permissions on Linux).
+Email delivery has **no `SMTP_*` env vars at all** — the Hostinger (or any)
+mailbox host, port, encryption mode, username, and password are entered in
+Settings and stored only in `waitlist.json` (written with `0600` permissions
+on Linux). Both submission modes are supported: **SSL/TLS on port 465**
+(implicit TLS, the default) and **STARTTLS on port 587** — use the latter when
+your host or VPS provider blocks outbound 465. Certificate verification is
+always on in both modes.
 Use the Settings page's built-in test-email button to confirm delivery before
 relying on it. Resetting the email section in Settings deletes the saved
 section so `EMAIL_FROM`/`RESEND_API_KEY` apply again.
@@ -87,7 +91,7 @@ src/
   store.js         # persistence + waitlist entry API
   settings.js      # settings validation, effective getters, allowlisted API views
   email.js         # provider-routed send (Resend / SMTP / none) + templates
-  smtp.js          # zero-dependency SMTP client (465/TLS) + MIME message builder
+  smtp.js          # zero-dependency SMTP client (465 SSL/TLS + 587 STARTTLS) + MIME message builder
   drop-api.js      # DROP account provisioning
   http.js          # request/response helpers
   views.js         # loads HTML pages from src/ui/ at startup

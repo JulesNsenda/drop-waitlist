@@ -182,9 +182,14 @@ test('buildMimeMessage: CRLF stripped from hostile to/from', () => {
 
 // Plain-TCP scripted SMTP server. Replies per verb; `opts` overrides individual
 // replies or destroys the socket on a given verb. Records every command line
-// and the full DATA payload.
+// and the full DATA payload. With `starttlsAdvertised`, EHLO advertises
+// STARTTLS and the STARTTLS command flips the connection into raw-byte
+// capture: the next chunk the client sends (its TLS ClientHello) is recorded
+// into `received.rawTlsBytes` and the socket destroyed — the mock never
+// actually speaks TLS (no cert fixtures), so the client's handshake is
+// expected to fail with a tls-phase error.
 function startMockServer(opts = {}) {
-  const received = { commands: [], message: null };
+  const received = { commands: [], message: null, rawTlsBytes: null };
   const sockets = new Set();
   const server = net.createServer((socket) => {
     sockets.add(socket);
@@ -192,8 +197,16 @@ function startMockServer(opts = {}) {
     socket.on('error', () => {});
     let buf = '';
     let inData = false;
+    let rawMode = false;
     socket.write('220 mock.example.com ESMTP ready\r\n');
     socket.on('data', (chunk) => {
+      if (rawMode) {
+        received.rawTlsBytes = received.rawTlsBytes
+          ? Buffer.concat([received.rawTlsBytes, chunk])
+          : Buffer.from(chunk);
+        socket.destroy();
+        return;
+      }
       buf += chunk.toString('utf8');
       for (;;) {
         if (inData) {
@@ -216,7 +229,12 @@ function startMockServer(opts = {}) {
           return;
         }
         if (upper.startsWith('EHLO')) {
-          socket.write('250-mock.example.com greets you\r\n250-SIZE 35882577\r\n250-AUTH PLAIN LOGIN\r\n250 8BITMIME\r\n');
+          socket.write(opts.starttlsAdvertised
+            ? '250-mock.example.com greets you\r\n250-SIZE 35882577\r\n250-STARTTLS\r\n250-AUTH PLAIN LOGIN\r\n250 8BITMIME\r\n'
+            : '250-mock.example.com greets you\r\n250-SIZE 35882577\r\n250-AUTH PLAIN LOGIN\r\n250 8BITMIME\r\n');
+        } else if (upper.startsWith('STARTTLS')) {
+          socket.write('220 2.0.0 ready to start TLS\r\n');
+          rawMode = true;
         } else if (upper.startsWith('AUTH')) {
           socket.write(opts.authReply || '235 2.7.0 authentication successful\r\n');
         } else if (upper.startsWith('MAIL FROM')) {
@@ -342,4 +360,47 @@ test('smtpSend: never rejects — resolves {sent:false} on unreachable port', as
   assert.equal(result.sent, false);
   assert.equal(result.phase, 'connect');
   assert.equal(result.error, 'could not connect to mail server');
+});
+
+// ── STARTTLS mode ──────────────────────────────────────────────────────────────
+// No _plainSocket hook needed here: in starttls mode the initial connection is
+// plain net by definition, which is exactly what the hook simulates for 'tls'.
+
+test('smtpSend starttls: fails closed when EHLO does not advertise STARTTLS — no AUTH/MAIL on plaintext', async () => {
+  const mock = await startMockServer(); // default EHLO reply: no STARTTLS capability
+  try {
+    const result = await smtpSend({ ...CREDS(mock.port), security: 'starttls' }, MESSAGE);
+    assert.equal(result.sent, false);
+    assert.equal(result.phase, 'starttls');
+    assert.equal(result.error, 'server does not offer STARTTLS on this port');
+    // give any (buggy) plaintext continuation a moment to arrive before counting
+    await new Promise((r) => setTimeout(r, 50));
+    const cmds = mock.received.commands.map((c) => c.toUpperCase());
+    assert.ok(!cmds.some((c) => c.startsWith('AUTH')), `AUTH sent on plaintext socket: ${JSON.stringify(mock.received.commands)}`);
+    assert.ok(!cmds.some((c) => c.startsWith('MAIL')), `MAIL sent on plaintext socket: ${JSON.stringify(mock.received.commands)}`);
+    assert.ok(!cmds.some((c) => c.startsWith('STARTTLS')), 'client sent STARTTLS despite it not being offered');
+  } finally {
+    await mock.stop();
+  }
+});
+
+test('smtpSend starttls: sends STARTTLS after 220 and opens with a TLS ClientHello (0x16) — tls-phase error against the non-TLS mock', async () => {
+  const mock = await startMockServer({ starttlsAdvertised: true });
+  try {
+    const result = await smtpSend({ ...CREDS(mock.port), security: 'starttls' }, MESSAGE);
+    // The mock cannot complete a TLS handshake — the upgrade failing with a
+    // tls-phase error IS the expected outcome; assert phase, not success.
+    assert.equal(result.sent, false);
+    assert.equal(result.phase, 'tls');
+    assert.equal(result.error, 'STARTTLS upgrade failed — could not establish a secure connection');
+
+    const cmds = mock.received.commands.map((c) => c.toUpperCase());
+    assert.ok(cmds.includes('STARTTLS'), `STARTTLS never sent: ${JSON.stringify(mock.received.commands)}`);
+    assert.ok(!cmds.some((c) => c.startsWith('AUTH')), 'AUTH sent before the TLS upgrade completed');
+    assert.ok(mock.received.rawTlsBytes && mock.received.rawTlsBytes.length > 0, 'no bytes after STARTTLS 220');
+    assert.equal(mock.received.rawTlsBytes[0], 0x16, // TLS handshake record type
+      `first post-STARTTLS byte was 0x${mock.received.rawTlsBytes[0].toString(16)}, not a TLS ClientHello`);
+  } finally {
+    await mock.stop();
+  }
 });

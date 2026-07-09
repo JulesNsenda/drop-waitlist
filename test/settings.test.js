@@ -206,11 +206,22 @@ test('validateEmailSection: rejects out-of-range and non-integer ports', async (
   );
 });
 
-test('validateEmailSection: rejects STARTTLS — only "tls" is accepted', async () => {
+test('validateEmailSection: accepts "starttls" and defaults its port to 587', async () => {
   const { store, settings } = freshModules();
   await store.loadStore();
   const result = settings.validateEmailSection({
     provider: 'smtp', from: 'a@b.com', smtp: { ...SMTP_OK, security: 'starttls' },
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.value.smtp.security, 'starttls');
+  assert.equal(result.value.smtp.port, 587);
+});
+
+test('validateEmailSection: rejects a bogus security value', async () => {
+  const { store, settings } = freshModules();
+  await store.loadStore();
+  const result = settings.validateEmailSection({
+    provider: 'smtp', from: 'a@b.com', smtp: { ...SMTP_OK, security: 'ssl3' },
   });
   assert.equal(result.ok, false);
 });
@@ -360,6 +371,22 @@ test('isEmailConfigured: resend true only when RESEND_API_KEY is set', async () 
   await withKey.store.loadStore();
   await withKey.store.setSettingsSection('email', { provider: 'resend', from: 'DROP <hello@drop.dev>', smtp: { host: '', port: 465, security: 'tls', username: '', password: '' } });
   assert.equal(withKey.settings.isEmailConfigured(), true);
+});
+
+// ── buildEmailView: security passthrough ────────────────────────────────────────
+
+test('buildEmailView: includes security, reflecting the saved mode', async () => {
+  const { store, settings } = freshModules();
+  await store.loadStore();
+
+  assert.equal(settings.buildEmailView().smtp.security, 'tls'); // nothing saved yet — default
+
+  const saved = settings.validateEmailSection({
+    provider: 'smtp', from: 'a@b.com', smtp: { ...SMTP_OK, security: 'starttls' },
+  });
+  assert.ok(saved.ok, saved.error);
+  await store.setSettingsSection('email', saved.value);
+  assert.equal(settings.buildEmailView().smtp.security, 'starttls');
 });
 
 // ── no-leak: the password must never surface in a view/response object ──────────

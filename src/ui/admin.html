@@ -231,10 +231,13 @@
             </div>
           </div>
           <div class="field">
-            <label>Encryption</label>
-            <span class="static-value">SSL/TLS (port 465)</span>
+            <label for="smtp-security">Encryption</label>
+            <select id="smtp-security">
+              <option value="tls">SSL/TLS (port 465)</option>
+              <option value="starttls">STARTTLS (port 587)</option>
+            </select>
           </div>
-          <p class="field-note">Hostinger: smtp.hostinger.com · port 465 · username is the full mailbox address</p>
+          <p class="field-note">Hostinger: smtp.hostinger.com — SSL/TLS on port 465, or STARTTLS on port 587 · username is the full mailbox address</p>
         </div>
 
         <div id="email-group-from" hidden>

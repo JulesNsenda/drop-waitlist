@@ -5,10 +5,10 @@ const tls = require('tls');
 const os = require('os');
 const crypto = require('crypto');
 
-// Zero-dependency SMTP client for implicit-TLS (port 465) submission, plus a
-// pure MIME message builder. No pipelining, no STARTTLS, no quoted-printable.
-// See docs/plans/2026-07-08-ui-settings-smtp.md for the full spec this
-// implements.
+// Zero-dependency SMTP client supporting implicit TLS (port 465, default) and
+// STARTTLS (port 587), plus a pure MIME message builder. No pipelining, no
+// quoted-printable. See docs/plans/2026-07-08-ui-settings-smtp.md (incl. the
+// 2026-07-08 STARTTLS addendum) for the full spec this implements.
 
 const IDLE_TIMEOUT_MS = 15000;
 const FINAL_TIMEOUT_MS = 60000;
@@ -20,16 +20,37 @@ const FINAL_TIMEOUT_MS = 60000;
 // errors into the same message (e.g. ECONNREFUSED vs. connect timeout) is
 // deliberate — it denies a leaked admin token a port-scan oracle — so the
 // real underlying detail is always logged server-side here instead.
-function humanMessage(phase, { err, code, text } = {}) {
+//
+// `security` ('tls' | 'starttls') makes the port/mode-mismatch messages
+// mode-aware, per the addendum's stated pairing (SSL/TLS <-> 465, STARTTLS
+// <-> 587): a 'tls'-mode handshake failure/greeting-timeout points at 587 +
+// STARTTLS; a 'starttls'-mode greeting timeout (e.g. actually pointed at 465,
+// where the server speaks TLS immediately instead of a plaintext greeting)
+// points back at 465 + SSL/TLS.
+function humanMessage(phase, { err, code, text, security } = {}) {
+  const mode = security === 'starttls' ? 'starttls' : 'tls';
+
+  // Fail-closed decision (no server error/reply involved): EHLO succeeded but
+  // didn't advertise STARTTLS, so the session was aborted before any AUTH/MAIL
+  // could be sent on the plaintext socket.
+  if (phase === 'starttls' && !err && code === undefined) {
+    return 'server does not offer STARTTLS on this port';
+  }
+
   if (err) {
     console.error(`[smtp] ${phase} failed: ${err.code || err.message}`);
     if (phase === 'dns') return 'mail server host not found';
     if (phase === 'connect') return 'could not connect to mail server';
-    if (phase === 'tls') return 'TLS/port mismatch — port 465 requires SSL/TLS';
+    if (phase === 'tls') {
+      return mode === 'starttls'
+        ? 'STARTTLS upgrade failed — could not establish a secure connection'
+        : 'SSL/TLS mode expects a TLS port like 465; for port 587 use STARTTLS';
+    }
     if (phase === 'greeting') {
-      return err.__smtpTimeout
-        ? 'TLS/port mismatch — port 465 requires SSL/TLS'
-        : 'could not connect to mail server';
+      if (!err.__smtpTimeout) return 'could not connect to mail server';
+      return mode === 'starttls'
+        ? 'STARTTLS mode expects a plaintext greeting — for port 465 use SSL/TLS'
+        : 'SSL/TLS mode expects a TLS port like 465; for port 587 use STARTTLS';
     }
     return 'connection to mail server was lost — try again later';
   }
@@ -52,15 +73,16 @@ function humanMessage(phase, { err, code, text } = {}) {
   return `mail server rejected the request (${phase} ${code}): ${cleanText}`;
 }
 
-// Classifies a connect/TLS-phase system error into one of dns|connect|tls.
-// TLS handshake/cert errors carry no recognizable network error code, so
-// "anything left over" is the catch-all — only reachable when not in the
-// plain-socket test mode.
-function classifyConnectError(err, usePlain) {
+// Classifies a connect-phase system error into one of dns|connect|tls. TLS
+// handshake/cert errors carry no recognizable network error code, so
+// "anything left over" is the catch-all — only reachable when the initial
+// connection is a real implicit-TLS one (i.e. not plain: not starttls mode,
+// not the plain-socket test hook).
+function classifyConnectError(err, isPlainInitial) {
   const sysCode = err && err.code;
   if (sysCode === 'ENOTFOUND' || sysCode === 'EAI_AGAIN') return 'dns';
   if (sysCode === 'ECONNREFUSED' || sysCode === 'ETIMEDOUT' || (err && err.__smtpTimeout)) return 'connect';
-  return usePlain ? 'connect' : 'tls';
+  return isPlainInitial ? 'connect' : 'tls';
 }
 
 // ── reply reader ─────────────────────────────────────────────────────────────
@@ -130,16 +152,19 @@ function makeReplyReader(socket) {
 
 // ── connection ───────────────────────────────────────────────────────────────
 
-// Opens the transport: TLS (implicit, port 465) by default, or a plain TCP
-// socket when `usePlain` is set (internal test hook only — never reachable
-// from settings validation). Certificate verification is never disabled.
-function connectSocket(host, port, usePlain) {
+// Opens the transport: TLS (implicit, port 465) by default, or plain TCP —
+// either because `security` is 'starttls' (the real STARTTLS flow always
+// starts plaintext and upgrades later) or because `usePlain` is set (internal
+// test hook only, meaningful for 'tls' mode — never reachable from settings
+// validation). Certificate verification is never disabled.
+function connectSocket(host, port, security, usePlain) {
   return new Promise((resolve, reject) => {
-    const socket = usePlain
+    const isPlainInitial = security === 'starttls' || usePlain;
+    const socket = isPlainInitial
       ? net.connect({ host, port })
       : tls.connect({ host, port, servername: host });
     let settled = false;
-    const readyEvent = usePlain ? 'connect' : 'secureConnect';
+    const readyEvent = isPlainInitial ? 'connect' : 'secureConnect';
 
     function onReady() {
       if (settled) return;
@@ -166,6 +191,61 @@ function connectSocket(host, port, usePlain) {
     socket.once(readyEvent, onReady);
     socket.once('error', onError);
     socket.once('timeout', onTimeout);
+  });
+}
+
+// STARTTLS upgrade (RFC 3207): wraps the already-connected plaintext socket
+// in TLS after the server's 220 response to the STARTTLS command. servername
+// is passed explicitly — tls.connect() does not derive SNI on its own when
+// wrapping an existing socket. Certificate verification is never disabled.
+//
+// The plain socket's listeners are detached first (its reply-reader and idle
+// timeout no longer apply once TLS owns the byte stream), and a permanent
+// no-op 'error' listener absorbs anything the raw socket still emits once the
+// TLS layer is tearing it down. On failure the tls socket itself is destroyed
+// and errors swallowed the same way, so a mid-handshake reset can't surface
+// as an unhandled 'error' or hang the caller past the timeout.
+function upgradeToTls(plainSocket, host) {
+  return new Promise((resolve, reject) => {
+    plainSocket.setTimeout(0);
+    plainSocket.removeAllListeners('data');
+    plainSocket.removeAllListeners('error');
+    plainSocket.removeAllListeners('close');
+    plainSocket.removeAllListeners('timeout');
+    plainSocket.on('error', () => {});
+
+    const tlsSocket = tls.connect({ socket: plainSocket, servername: host });
+    let settled = false;
+    tlsSocket.setTimeout(IDLE_TIMEOUT_MS);
+
+    function onReady() {
+      if (settled) return;
+      settled = true;
+      tlsSocket.removeListener('error', onError);
+      tlsSocket.removeListener('close', onClose);
+      tlsSocket.removeListener('timeout', onTimeout);
+      resolve(tlsSocket);
+    }
+    function onError(err) {
+      if (settled) return;
+      settled = true;
+      tlsSocket.on('error', () => {}); // absorb any further teardown error
+      try { tlsSocket.destroy(); } catch (e) { /* already gone */ }
+      reject(err);
+    }
+    function onClose() {
+      onError(new Error('connection closed during TLS upgrade'));
+    }
+    function onTimeout() {
+      const err = new Error('TLS upgrade handshake timeout');
+      err.__smtpTimeout = true;
+      onError(err);
+    }
+
+    tlsSocket.once('secureConnect', onReady);
+    tlsSocket.once('error', onError);
+    tlsSocket.once('close', onClose);
+    tlsSocket.once('timeout', onTimeout);
   });
 }
 
@@ -203,6 +283,13 @@ function parseAuthMechanisms(lines) {
     if (m) return m[1].trim().toUpperCase().split(/\s+/).filter(Boolean);
   }
   return [];
+}
+
+// Whether an EHLO reply's raw lines advertise the STARTTLS extension.
+// Capabilities pre-TLS are only trustworthy for this one check — everything
+// else (incl. AUTH) is re-read from the post-upgrade EHLO (RFC 3207).
+function hasStartTls(lines) {
+  return lines.some((line) => /^\d{3}[ -]STARTTLS\s*$/i.test(line));
 }
 
 // ── message builder — pure, no sockets ──────────────────────────────────────
@@ -339,35 +426,45 @@ function buildMimeMessage({ from, to, subject, html, text, date, messageId }) {
 // ── protocol driver ──────────────────────────────────────────────────────────
 
 // Runs one full send over a fresh connection: connect -> greeting -> EHLO ->
-// AUTH -> MAIL FROM -> RCPT TO -> DATA -> dataResult. Lockstep, no
-// pipelining — one pending command at a time.
+// [STARTTLS -> re-EHLO, when security is 'starttls'] -> AUTH -> MAIL FROM ->
+// RCPT TO -> DATA -> dataResult. Lockstep, no pipelining — one pending
+// command at a time.
 async function runSession(creds, msg, opts) {
   const { host, port, username, password } = creds;
+  const security = creds.security === 'starttls' ? 'starttls' : 'tls';
   const usePlain = !!(opts && opts._plainSocket);
+  const initialPlain = security === 'starttls' || usePlain;
 
   let socket;
   try {
-    socket = await connectSocket(host, port, usePlain);
+    socket = await connectSocket(host, port, security, usePlain);
   } catch (err) {
-    const errPhase = classifyConnectError(err, usePlain);
-    return { sent: false, error: humanMessage(errPhase, { err }), phase: errPhase };
+    const errPhase = classifyConnectError(err, initialPlain);
+    return { sent: false, error: humanMessage(errPhase, { err, security }), phase: errPhase };
   }
 
   // Persistent idle-timeout handler for the rest of the session (connectSocket
   // only covered the connect phase). destroy(err) emits 'error', which the
-  // reply reader turns into a fast rejection of the pending wait.
-  socket.on('timeout', () => {
-    const err = new Error('idle timeout waiting for mail server');
-    err.__smtpTimeout = true;
-    socket.destroy(err);
-  });
+  // reply reader turns into a fast rejection of the pending wait. Re-armed on
+  // the upgraded socket after a STARTTLS handshake (below) — the plain
+  // socket's handler is detached as part of that upgrade.
+  function armIdleTimeout(sock) {
+    sock.on('timeout', () => {
+      const err = new Error('idle timeout waiting for mail server');
+      err.__smtpTimeout = true;
+      sock.destroy(err);
+    });
+  }
+  armIdleTimeout(socket);
 
-  const reader = makeReplyReader(socket);
+  let reader = makeReplyReader(socket);
   let phase = 'greeting';
 
+  // Closes over `socket` (not a snapshot) so it always targets whichever
+  // socket is current — including after the STARTTLS upgrade reassigns it.
   function fail(atPhase, reply) {
     closeQuietly(socket);
-    return { sent: false, error: humanMessage(atPhase, { code: reply.code, text: reply.text }), phase: atPhase };
+    return { sent: false, error: humanMessage(atPhase, { code: reply.code, text: reply.text, security }), phase: atPhase };
   }
 
   try {
@@ -378,6 +475,35 @@ async function runSession(creds, msg, opts) {
     send(socket, `EHLO ${sanitizeHostname(os.hostname())}`);
     reply = await reader.readReply();
     if (reply.code !== 250) return fail('ehlo', reply);
+
+    if (security === 'starttls') {
+      // Fail closed: never send AUTH/MAIL over the plaintext socket if the
+      // server doesn't offer STARTTLS.
+      if (!hasStartTls(reply.lines)) {
+        phase = 'starttls';
+        closeQuietly(socket);
+        return { sent: false, error: humanMessage('starttls', { security }), phase };
+      }
+
+      phase = 'starttls';
+      send(socket, 'STARTTLS');
+      reply = await reader.readReply();
+      if (reply.code !== 220) return fail('starttls', reply);
+
+      // TLS-upgrade handshake failures map to the tls phase; a rejection here
+      // propagates to the outer catch below (phase is already 'tls').
+      phase = 'tls';
+      socket = await upgradeToTls(socket, host);
+      armIdleTimeout(socket);
+      reader = makeReplyReader(socket);
+
+      // RFC 3207: capabilities (incl. AUTH) are only trustworthy post-TLS.
+      phase = 'ehlo';
+      send(socket, `EHLO ${sanitizeHostname(os.hostname())}`);
+      reply = await reader.readReply();
+      if (reply.code !== 250) return fail('ehlo', reply);
+    }
+
     const mechanisms = parseAuthMechanisms(reply.lines);
 
     phase = 'auth';
@@ -431,7 +557,7 @@ async function runSession(creds, msg, opts) {
     } catch (e) {
       // already gone
     }
-    return { sent: false, error: humanMessage(phase, { err }), phase };
+    return { sent: false, error: humanMessage(phase, { err, security }), phase };
   }
 }
 

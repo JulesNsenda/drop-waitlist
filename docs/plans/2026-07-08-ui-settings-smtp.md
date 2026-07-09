@@ -203,6 +203,29 @@ Estimated ~950–1100 lines production, ~380 tests.
 - **Node 18 floor**: everything used (tls.connect servername, setTimeout,
   replaceAll, Buffer base64) is Node 18-clean (verified by the feasibility review).
 
+## Addendum 2026-07-08: STARTTLS/587 (v1 cut reversed)
+
+Live-fire testing found the founder's VPS provider blocks outbound 465 upstream (no
+local firewall rules; 587 and 443 open from host and container — verified by SSH
+diagnostics). The deferred STARTTLS support is therefore implemented, per the
+feasibility review's own §5 requirements:
+
+- Validation accepts `security: 'tls' | 'starttls'`. STARTTLS flow: plain `net.connect`
+  → 220 → EHLO → **fail closed if STARTTLS not advertised** (no plaintext AUTH, ever) →
+  `STARTTLS` → 220 → `tls.connect({socket, servername: host})` (SNI explicit — not
+  auto-derived when wrapping a socket; cert verification stays mandatory) → **re-EHLO on
+  the upgraded socket** → AUTH → unchanged. Reply reader re-binds to the upgraded
+  socket with a fresh buffer.
+- Error map: STARTTLS-not-offered gets its own message; the port-mismatch hint becomes
+  mode-aware ("SSL/TLS ↔ port 465, STARTTLS ↔ port 587").
+- UI: the static "SSL/TLS (465)" row becomes a select (SSL/TLS 465 / STARTTLS 587);
+  choosing a mode auto-fills the matching default port if the port still holds the other
+  default. GET/POST smtp view gains `security`.
+- Tests (no TLS cert fixtures, per the feasibility review): fail-closed when STARTTLS
+  not advertised (assert no AUTH sent); STARTTLS advertised → client sends the command
+  and, after 220, emits a TLS ClientHello (first byte 0x16) on the wire. The real
+  upgrade path is covered by the live test-email against Hostinger.
+
 ## Agent critiques considered
 
 Three adversarial reviews ran in parallel (security/credentials, SMTP feasibility,

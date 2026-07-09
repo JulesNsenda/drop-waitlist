@@ -112,6 +112,7 @@ async function sendEmail({ to, subject, html }) {
       {
         host: effective.smtp.host,
         port: effective.smtp.port,
+        security: effective.smtp.security,
         username: effective.smtp.username,
         password: effective.smtp.password,
       },
