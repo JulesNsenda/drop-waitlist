@@ -6,30 +6,90 @@
   /* palette */
   --bg:            #0a0a0f;
   --surface:       #111118;
+  --surface-2:     #191922;
   --border:        #1f2937;
   --border-subtle: #1a1a22;
+  --border-hover:  #383849;
   --text:          #e5e7eb;
-  --text-muted:    #6b7280;
-  --text-dim:      #374151;
+  --text-muted:    #9ca3af;
+  --text-dim:      #7b8394;
   --brand:         #4f46e5;
   --brand-hover:   #6366f1;
+  --focus:         #6366f1;
   --green:         #34d399;
   --red:           #f87171;
   --yellow:        #f59e0b;
+
+  /* layout */
+  --radius: 10px;
 }
 
 *, *::before, *::after {
   box-sizing: border-box;
 }
 
+/* Self-hosted Inter Variable (no CDN fetch) */
+@font-face {
+  font-family: 'Inter';
+  src: url('/ui/inter-var.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+html {
+  background: var(--bg);
+}
+
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
   background: var(--bg);
   color: var(--text);
+}
+
+/* Keyboard focus ring, shared by every interactive element */
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+::placeholder {
+  color: var(--text-muted);
+  opacity: 1;
+}
+
+::selection {
+  background: var(--brand);
+  color: #fff;
+}
+
+/* Input hover affordance */
+input:hover, textarea:hover, select:hover {
+  border-color: var(--border-hover);
+}
+
+/* Visually hide content while keeping it available to screen readers */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 /* Shared status colours */
 .ok   { color: var(--green); }
 .err  { color: var(--red); }
 .warn { color: var(--yellow); }
+
+/* Respect reduced-motion preference across both pages */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

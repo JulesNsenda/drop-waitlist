@@ -4,6 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>DROP — join the beta</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%234f46e5'/><path d='M20 18h12a14 14 0 0 1 0 28H20z' fill='white'/></svg>">
+  <meta name="theme-color" content="#0a0a0f">
+  <meta name="description" content="DROP is a self-hosted PaaS. Deploy by dropping a folder — no config, no pipelines, no YAML. Join the private beta.">
+  <meta property="og:title" content="DROP — deploy by dropping a folder">
+  <meta property="og:description" content="DROP is a self-hosted PaaS. Deploy by dropping a folder — no config, no pipelines, no YAML. Join the private beta.">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary">
   <link rel="stylesheet" href="/ui/shared.css">
   <link rel="stylesheet" href="/ui/landing.css">
 </head>
@@ -13,11 +20,12 @@
 <div class="wrap">
   <div class="logo">◧</div>
   <p class="kicker">What if deploying was just</p>
-  <h1>dropping<br>a folder<span>?</span></h1>
+  <h1><span class="grad">dropping</span><br>a folder<span class="q">?</span></h1>
   <p class="sub">DROP is a self-hosted PaaS. No config. No pipelines. No YAML.<br>Join the private beta.</p>
   <form id="f">
-    <input id="email" type="email" placeholder="you@example.com" required autocomplete="email">
-    <input id="name"  type="text"  placeholder="Name (optional)" autocomplete="name">
+    <input id="email" type="email" placeholder="you@example.com" required autocomplete="email"
+           aria-label="Email address" autocapitalize="none" spellcheck="false">
+    <input id="name"  type="text"  placeholder="Name (optional)" autocomplete="name" aria-label="Name (optional)">
     <!-- Honeypot: bots fill this; real users never see it. Styled off-screen,
          not type=hidden, to avoid password-manager auto-fill. The name must stay
          non-semantic: Chrome ignores autocomplete="off" and autofills anything
@@ -28,7 +36,7 @@
            style="position:absolute;left:-9999px;opacity:0;height:0;width:0;border:0;padding:0">
     <button id="b" type="submit">Join the beta</button>
   </form>
-  <div class="msg" id="m"></div>
+  <div class="msg" id="m" role="status" aria-live="polite"></div>
 </div>
 <div class="foot">This waitlist runs on DROP — the self-hosted PaaS you're signing up for :)</div>
 

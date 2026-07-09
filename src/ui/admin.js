@@ -133,7 +133,7 @@
 
   function fmtDateSafe(iso) {
     const t = iso ? new Date(iso).getTime() : NaN;
-    return Number.isFinite(t) ? new Date(t).toLocaleDateString() : '—';
+    return Number.isFinite(t) ? new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
   }
 
   function fmtDateTimeSafe(iso) {

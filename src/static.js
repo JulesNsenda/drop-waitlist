@@ -8,6 +8,7 @@ const UI_DIR = path.join(__dirname, 'ui');
 const CONTENT_TYPES = {
   '.css': 'text/css; charset=utf-8',
   '.js':  'application/javascript; charset=utf-8',
+  '.woff2': 'font/woff2',
 };
 
 async function serveStatic(res, pathname) {
@@ -28,7 +29,7 @@ async function serveStatic(res, pathname) {
   }
 
   try {
-    const content = await fsp.readFile(path.join(UI_DIR, filename), 'utf-8');
+    const content = await fsp.readFile(path.join(UI_DIR, filename));
     res.writeHead(200, { 'Content-Type': contentType });
     res.end(content);
   } catch {

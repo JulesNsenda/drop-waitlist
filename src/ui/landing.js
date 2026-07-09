@@ -9,6 +9,8 @@
     e.preventDefault();
     msg.textContent = '';
     btn.disabled = true;
+    const originalBtnText = btn.textContent;
+    btn.textContent = 'Joining…';
 
     try {
       const res = await fetch('/api/join', {
@@ -35,5 +37,6 @@
     }
 
     btn.disabled = false;
+    btn.textContent = originalBtnText;
   });
 })();

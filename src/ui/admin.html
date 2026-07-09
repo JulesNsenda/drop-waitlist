@@ -4,6 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>DROP waitlist — admin</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%234f46e5'/><path d='M20 18h12a14 14 0 0 1 0 28H20z' fill='white'/></svg>">
+  <meta name="theme-color" content="#0a0a0f">
   <link rel="stylesheet" href="/ui/shared.css">
   <link rel="stylesheet" href="/ui/admin.css">
 </head>
@@ -16,7 +18,7 @@
     <p class="kicker">DROP admin</p>
     <h1>Waitlist admin</h1>
     <form id="gate-form" novalidate>
-      <input id="gate-tok" type="password" placeholder="Admin token"
+      <input id="gate-tok" type="password" placeholder="Admin token" aria-label="Admin token"
              autocomplete="current-password" autofocus required>
       <button id="gate-submit" type="submit">Enter</button>
     </form>
@@ -27,7 +29,7 @@
 <!-- ── app shell ────────────────────────────────────────────────────────────── -->
 <div id="shell" class="shell" style="display:none">
 
-  <nav class="sidebar">
+  <nav class="sidebar" aria-label="Primary">
     <div class="brand">
       <span class="logo-mark">◧</span>
       <span class="wordmark">DROP</span>
@@ -79,14 +81,14 @@
       </div>
 
       <div class="toolbar">
-        <input type="search" id="search-input" placeholder="Search email or name…">
+        <input type="search" id="search-input" placeholder="Search email or name…" aria-label="Search waitlist">
         <button class="btn-ghost" id="export-csv-btn">Export all (CSV)</button>
       </div>
 
       <div class="table-wrap">
-        <table>
+        <table aria-label="Waitlist entries">
           <thead>
-            <tr><th>Email</th><th>Name</th><th>Status</th><th>Joined</th><th></th></tr>
+            <tr><th scope="col">Email</th><th scope="col">Name</th><th scope="col">Status</th><th scope="col">Joined</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr>
           </thead>
           <tbody id="rows"></tbody>
         </table>
@@ -126,8 +128,10 @@
             <p class="field-note">HTML is sent as-is. Inline CSS only — most email clients strip &lt;style&gt; blocks.</p>
           </div>
           <div class="field">
-            <label>Preview</label>
-            <iframe class="preview-frame" id="preview-confirmation" sandbox title="Confirmation email preview"></iframe>
+            <span class="field-label">Preview</span>
+            <div class="preview-shell">
+              <iframe class="preview-frame" id="preview-confirmation" sandbox title="Confirmation email preview"></iframe>
+            </div>
           </div>
         </div>
         <div class="editor-actions">
@@ -169,8 +173,10 @@
             <p class="field-note">HTML is sent as-is. Inline CSS only — most email clients strip &lt;style&gt; blocks.</p>
           </div>
           <div class="field">
-            <label>Preview</label>
-            <iframe class="preview-frame" id="preview-invite" sandbox title="Invite email preview"></iframe>
+            <span class="field-label">Preview</span>
+            <div class="preview-shell">
+              <iframe class="preview-frame" id="preview-invite" sandbox title="Invite email preview"></iframe>
+            </div>
           </div>
         </div>
         <div class="editor-actions">
