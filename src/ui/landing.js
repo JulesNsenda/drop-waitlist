@@ -17,7 +17,7 @@
         body: JSON.stringify({
           email:   document.getElementById('email').value,
           name:    document.getElementById('name').value,
-          company: document.getElementById('company').value,
+          company: document.getElementById('contact_pref_x').value,
         }),
       });
       const data = await res.json();

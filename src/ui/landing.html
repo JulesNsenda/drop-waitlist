@@ -19,8 +19,11 @@
     <input id="email" type="email" placeholder="you@example.com" required autocomplete="email">
     <input id="name"  type="text"  placeholder="Name (optional)" autocomplete="name">
     <!-- Honeypot: bots fill this; real users never see it. Styled off-screen,
-         not type=hidden, to avoid password-manager auto-fill. -->
-    <input id="company" name="company" type="text" tabindex="-1" autocomplete="off"
+         not type=hidden, to avoid password-manager auto-fill. The name must stay
+         non-semantic: Chrome ignores autocomplete="off" and autofills anything
+         its heuristics classify (a field named "company" gets the user's saved
+         organization), which silently flagged real signups as bots. -->
+    <input id="contact_pref_x" name="contact_pref_x" type="text" tabindex="-1" autocomplete="off"
            aria-hidden="true"
            style="position:absolute;left:-9999px;opacity:0;height:0;width:0;border:0;padding:0">
     <button id="b" type="submit">Join the beta</button>

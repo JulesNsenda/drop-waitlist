@@ -30,8 +30,13 @@ async function handleJoin(req, res) {
 
   const body = await readJsonBody(req);
 
-  // 2. Honeypot — filled means a bot; return 200 silently (don't teach bots the field name).
-  if (body && body.company) return sendJson(res, 200, { ok: true });
+  // 2. Honeypot — filled means a bot; return 200 silently (don't teach bots the
+  //    field name). Logged so a false positive (e.g. browser autofill) is
+  //    diagnosable instead of a silent drop.
+  if (body && body.company) {
+    console.error('[waitlist] honeypot triggered, dropping join for', String(body.email || '').slice(0, 200));
+    return sendJson(res, 200, { ok: true });
+  }
 
   // 3. Validate email.
   if (!body || !EMAIL_RE.test(String(body.email || ''))) {
