@@ -27,7 +27,10 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && p === '/health') return sendJson(res, 200, { ok: true });
     if (req.method === 'GET' && (p === '/' || p === '')) return send(res, 200, LANDING_HTML);
     if (req.method === 'GET' && p === '/admin') return send(res, 200, ADMIN_HTML);
-    if (req.method === 'POST' && p === '/api/join') return handleJoin(req, res);
+    // Async handlers are awaited so a rejection lands in the catch below —
+    // `return handler()` without await would escape the try and crash the
+    // process as an unhandled rejection.
+    if (req.method === 'POST' && p === '/api/join') return await handleJoin(req, res);
 
     // ── admin endpoints (all token-gated) ────────────────────────────────────
     if (p === '/api/admin/entries' && req.method === 'GET') {
@@ -36,7 +39,7 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === '/api/admin/approve' && req.method === 'POST') {
       if (!adminAuthorized(req)) return sendJson(res, 403, { ok: false, error: 'Forbidden' });
-      return handleApprove(req, res);
+      return await handleApprove(req, res);
     }
     if (p === '/api/admin/settings' && req.method === 'GET') {
       if (!adminAuthorized(req)) return sendJson(res, 403, { ok: false, error: 'Forbidden' });
@@ -44,23 +47,23 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === '/api/admin/settings' && req.method === 'POST') {
       if (!adminAuthorized(req)) return sendJson(res, 403, { ok: false, error: 'Forbidden' });
-      return handleSaveSettings(req, res);
+      return await handleSaveSettings(req, res);
     }
     if (p === '/api/admin/settings/reset' && req.method === 'POST') {
       if (!adminAuthorized(req)) return sendJson(res, 403, { ok: false, error: 'Forbidden' });
-      return handleResetSettings(req, res);
+      return await handleResetSettings(req, res);
     }
     if (p === '/api/admin/test-email' && req.method === 'POST') {
       if (!adminAuthorized(req)) return sendJson(res, 403, { ok: false, error: 'Forbidden' });
-      return handleTestEmail(req, res);
+      return await handleTestEmail(req, res);
     }
     if (p === '/api/admin/templates' && req.method === 'POST') {
       if (!adminAuthorized(req)) return sendJson(res, 403, { ok: false, error: 'Forbidden' });
-      return handleSaveTemplate(req, res);
+      return await handleSaveTemplate(req, res);
     }
     if (p === '/api/admin/templates/reset' && req.method === 'POST') {
       if (!adminAuthorized(req)) return sendJson(res, 403, { ok: false, error: 'Forbidden' });
-      return handleResetTemplate(req, res);
+      return await handleResetTemplate(req, res);
     }
     if (p === '/api/admin/export.csv' && req.method === 'GET') {
       if (!adminAuthorized(req)) return sendJson(res, 403, { ok: false, error: 'Forbidden' });
