@@ -16,7 +16,6 @@ const {
 
 // Read once at startup — fails fast if a file is missing.
 const LANDING_HTML = fs.readFileSync(path.join(__dirname, 'ui', 'landing.html'), 'utf-8');
-const JOIN_HTML = fs.readFileSync(path.join(__dirname, 'ui', 'join.html'), 'utf-8');
 const ADMIN_HTML = fs.readFileSync(path.join(__dirname, 'ui', 'admin.html'), 'utf-8');
 
 const server = http.createServer(async (req, res) => {
@@ -27,7 +26,11 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && p.startsWith('/ui/')) return serveStatic(res, p);
     if (req.method === 'GET' && p === '/health') return sendJson(res, 200, { ok: true });
     if (req.method === 'GET' && (p === '/' || p === '')) return send(res, 200, LANDING_HTML);
-    if (req.method === 'GET' && p === '/join') return send(res, 200, JOIN_HTML);
+    // Kept for links published while the signup lived at /join.
+    if (req.method === 'GET' && p === '/join') {
+      res.writeHead(301, { Location: '/' });
+      return res.end();
+    }
     if (req.method === 'GET' && p === '/admin') return send(res, 200, ADMIN_HTML);
     // Async handlers are awaited so a rejection lands in the catch below —
     // `return handler()` without await would escape the try and crash the
