@@ -613,45 +613,12 @@ h1 {
   margin: 0 auto 30px;
 }
 
-.join-form {
+.cta-buttons {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   justify-content: center;
   flex-wrap: wrap;
-  max-width: 640px;
-  margin: 0 auto;
 }
-
-.join-form input[type="email"],
-.join-form input[type="text"] {
-  padding: 12px 16px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background: var(--bg-3);
-  color: var(--text);
-  font-family: var(--sans);
-  font-size: 15px;
-  transition: border-color .15s ease;
-}
-
-.join-form input:hover { border-color: var(--accent-2); }
-.join-form input:focus { border-color: var(--accent); }
-
-#email { flex: 1 1 240px; }
-#name { flex: 1 1 170px; }
-
-.msg {
-  margin-top: 16px;
-  font-family: var(--mono);
-  font-size: 14px;
-  min-height: 20px;
-}
-
-@keyframes msg-fade-in { from { opacity: 0; } to { opacity: 1; } }
-
-.msg.ok { color: var(--ok); animation: msg-fade-in .3s ease both; }
-.msg.ok::before { content: '✓ '; }
-.msg.err { color: var(--err); }
 
 .cta-note {
   margin-top: 26px;

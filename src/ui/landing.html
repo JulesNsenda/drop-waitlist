@@ -33,7 +33,7 @@
     <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Toggle theme">
       <span class="theme-icon" aria-hidden="true"></span>
     </button>
-    <a class="btn btn-primary btn-nav" href="#join">Join the beta</a>
+    <a class="btn btn-primary btn-nav" href="/join">Join the beta</a>
   </div>
 </nav>
 
@@ -47,7 +47,7 @@
       <h1>Drop a folder.<br>Get a URL.</h1>
       <p class="hero-sub">A lightweight, self-hosted platform engineered for the drop-folder-and-deploy workflow. Zero configuration for 80% of use cases — auto-detect, build, and ship Node.js, Python, static sites, and containers.</p>
       <div class="hero-ctas">
-        <a class="btn btn-primary" href="#join"><span class="btn-prompt" aria-hidden="true">$</span>drop join --beta</a>
+        <a class="btn btn-primary" href="/join"><span class="btn-prompt" aria-hidden="true">$</span>drop join --beta</a>
         <a class="btn btn-ghost" href="#how">How it works →</a>
       </div>
       <div class="hero-points">
@@ -69,7 +69,7 @@
           <div class="t-dim"><span class="t-accent2">→</span> Provisioning PostgreSQL… <span class="t-text">DATABASE_URL</span> <span class="t-green">✓</span></div>
           <div class="t-dim"><span class="t-accent2">→</span> Building… done in <span class="t-text">8.2s</span></div>
           <div class="t-dim"><span class="t-accent2">→</span> Starting via PM2… <span class="t-green">online ✓</span></div>
-          <div class="t-done">✔ Deployed → <a href="#join">https://myapp.localhost</a><span class="cursor" aria-hidden="true"></span></div>
+          <div class="t-done">✔ Deployed → <a href="/join">https://myapp.localhost</a><span class="cursor" aria-hidden="true"></span></div>
         </div>
       </div>
     </div>
@@ -177,7 +177,7 @@
         <div class="eyebrow">Web Dashboard</div>
         <h2>Watch every app in real time.</h2>
         <p>Live process health, streaming stdout/stderr, per-app metrics, database status and routing — all at <code>/dashboard</code>. Built on PM2 for reliable auto-restart.</p>
-        <a class="btn btn-primary" href="#join">Get early access →</a>
+        <a class="btn btn-primary" href="/join">Get early access →</a>
       </div>
       <div class="dash-visual">
         <div class="dash-mock">
@@ -247,7 +247,7 @@
       <div class="eyebrow">Command line</div>
       <h2>Install once. Deploy anything.</h2>
       <p>A full-featured CLI plus a REST API secured with JWT and API keys. Manage apps, logs, and domains from your terminal or CI.</p>
-      <a class="cli-link" href="#join">Get early access to the CLI →</a>
+      <a class="cli-link" href="/join">Get early access to the CLI →</a>
     </div>
     <div class="cli-cmds">
       <div class="cli-cmd">
@@ -274,26 +274,14 @@
   </div>
 </section>
 
-<section id="join" class="container cta-section">
+<section class="container cta-section">
   <div class="cta-panel">
     <span class="drop-mark drop-mark-lg" aria-hidden="true"></span>
     <h2>Drop a folder. Get a URL.</h2>
     <p>Self-host DROP in minutes. Zero configuration for 80% of use cases. Join the private beta and be first in line.</p>
-    <form id="f" class="join-form">
-      <input id="email" type="email" placeholder="you@example.com" required autocomplete="email"
-             aria-label="Email address" autocapitalize="none" spellcheck="false">
-      <input id="name" type="text" placeholder="Name (optional)" autocomplete="name" aria-label="Name (optional)">
-      <!-- Honeypot: bots fill this; real users never see it. Styled off-screen,
-           not type=hidden, to avoid password-manager auto-fill. The name must stay
-           non-semantic: Chrome ignores autocomplete="off" and autofills anything
-           its heuristics classify (a field named "company" gets the user's saved
-           organization), which silently flagged real signups as bots. -->
-      <input id="contact_pref_x" name="contact_pref_x" type="text" tabindex="-1" autocomplete="off"
-             aria-hidden="true"
-             style="position:absolute;left:-9999px;opacity:0;height:0;width:0;border:0;padding:0">
-      <button id="b" class="btn btn-primary" type="submit">Join the beta</button>
-    </form>
-    <div class="msg" id="m" role="status" aria-live="polite"></div>
+    <div class="cta-buttons">
+      <a class="btn btn-primary" href="/join">Join the beta</a>
+    </div>
     <div class="cta-note">This waitlist runs on DROP — the self-hosted PaaS you're signing up for :)</div>
   </div>
 </section>
@@ -331,7 +319,7 @@
     <div class="footer-col">
       <div class="footer-col-title">Beta</div>
       <div class="footer-col-links">
-        <a href="#join">Join the waitlist</a>
+        <a href="/join">Join the waitlist</a>
         <a href="/admin">Admin sign-in</a>
         <a href="/health">Status</a>
       </div>
