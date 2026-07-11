@@ -146,3 +146,109 @@ test('provisionAccount: happy path returns {ok:true, username, password}', async
   assert.equal(typeof result.password, 'string');
   assert.ok(result.password.length > 0);
 });
+
+// ── reprovisionAccount (re-invite) ──────────────────────────────────────────────
+
+test('reprovisionAccount: happy path resolves username -> id, resets password, returns {ok:true, username, password}', async () => {
+  const { dropApi } = freshModules({ DROP_ADMIN_API_KEY: 'a-key' });
+  const calls = [];
+  global.fetch = async (url, opts) => {
+    calls.push({ url, opts });
+    if (calls.length === 1) {
+      return {
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify({ success: true, data: [{ id: 'u1', username: 'ada', enabled: true }] }),
+      };
+    }
+    return { ok: true, status: 200, text: async () => '' };
+  };
+
+  const result = await dropApi.reprovisionAccount('ada');
+  assert.equal(result.ok, true);
+  assert.equal(result.username, 'ada');
+  assert.equal(typeof result.password, 'string');
+  assert.equal(result.password.length, 16);
+
+  assert.equal(calls.length, 2);
+  assert.match(calls[0].url, /\/api\/v1\/auth\/users$/);
+  assert.match(calls[1].url, /\/api\/v1\/auth\/users\/u1\/reset-password$/);
+  assert.equal(calls[1].opts.method, 'POST');
+  const resetBody = JSON.parse(calls[1].opts.body);
+  assert.equal(typeof resetBody.newPassword, 'string');
+  assert.ok(resetBody.newPassword.length > 0);
+});
+
+test('reprovisionAccount: username not found in the user list returns {ok:false, code:"not_found"} without a second fetch', async () => {
+  const { dropApi } = freshModules({ DROP_ADMIN_API_KEY: 'a-key' });
+  const calls = [];
+  global.fetch = async (url) => {
+    calls.push(url);
+    return {
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({ success: true, data: [{ id: 'u1', username: 'someoneelse', enabled: true }] }),
+    };
+  };
+
+  const result = await dropApi.reprovisionAccount('ghost');
+  assert.deepEqual(result, { ok: false, code: 'not_found' });
+  assert.equal(calls.length, 1);
+});
+
+test('reprovisionAccount: matching but disabled account returns {ok:false, code:"disabled"} without a second fetch', async () => {
+  const { dropApi } = freshModules({ DROP_ADMIN_API_KEY: 'a-key' });
+  const calls = [];
+  global.fetch = async (url) => {
+    calls.push(url);
+    return {
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({ success: true, data: [{ id: 'u1', username: 'ada', enabled: false }] }),
+    };
+  };
+
+  const result = await dropApi.reprovisionAccount('ada');
+  assert.deepEqual(result, { ok: false, code: 'disabled' });
+  assert.equal(calls.length, 1);
+});
+
+test('reprovisionAccount: reset-password call failing returns {ok:false} with the status in the error', async () => {
+  const { dropApi } = freshModules({ DROP_ADMIN_API_KEY: 'a-key' });
+  let call = 0;
+  global.fetch = async () => {
+    call += 1;
+    if (call === 1) {
+      return {
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify({ success: true, data: [{ id: 'u1', username: 'ada', enabled: true }] }),
+      };
+    }
+    return { ok: false, status: 500, text: async () => 'internal error' };
+  };
+
+  const result = await dropApi.reprovisionAccount('ada');
+  assert.equal(result.ok, false);
+  assert.ok(result.error.includes('500'), `expected status 500 in: ${result.error}`);
+});
+
+test('reprovisionAccount: a thrown fetch error surfaces only the cause code, never the key', async () => {
+  const KEY = 'SECRET-KEY-abc123';
+  const { dropApi } = freshModules({ DROP_ADMIN_API_KEY: KEY });
+  global.fetch = async () => {
+    // Mirrors the real failure mode: Node's fetch throws a TypeError that
+    // embeds the full (invalid) header value when it contains non-ByteString
+    // characters — this must never reach the caller unsanitized.
+    throw new TypeError(`Header content contains invalid characters: Bearer ${KEY}`);
+  };
+
+  const result = await dropApi.reprovisionAccount('ada');
+  assert.equal(result.ok, false);
+  assert.ok(result.error.includes('DROP API request failed'), `unexpected message: ${result.error}`);
+  assert.ok(!result.error.includes(KEY), `key leaked in error: ${result.error}`);
+  assert.ok(
+    !result.error.includes('Header content contains invalid characters'),
+    `original fetch error message leaked: ${result.error}`
+  );
+});

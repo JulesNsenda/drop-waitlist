@@ -8,7 +8,7 @@ const {
   validateEmailSection, validateInvitesEnabled, validateDropAdminKey, validateDashboardUrl,
   buildEmailView, buildInvitesView, isEmailConfigured, hasControlChars,
 } = require('./settings');
-const { provisionAccount } = require('./drop-api');
+const { provisionAccount, reprovisionAccount } = require('./drop-api');
 const { sendJson, readJsonBody } = require('./http');
 const { getClientIp, makeRateLimiter, allowEmailSend } = require('./throttle');
 const { entriesToCsv } = require('./csv');
@@ -105,6 +105,57 @@ async function handleApprove(req, res) {
 
   return sendJson(res, 200, {
     ok: true, created: true, username: result.username,
+    emailSent: emailResult.sent, emailError: emailResult.error || null,
+    tempPassword: emailResult.sent ? undefined : result.password,
+  });
+}
+
+// Re-invites an entry already at status 'invited' (recipient never got the
+// email, lost it, or never logged in). The temp password is never persisted
+// (only entry.username is), so this can't resend the original credentials —
+// it resets the DROP account's password to a fresh one and emails that.
+async function handleReinvite(req, res) {
+  const body = await readJsonBody(req);
+  const entry = body && body.id ? findById(body.id) : null;
+  if (!entry) return sendJson(res, 404, { ok: false, error: 'Entry not found.' });
+  if (entry.status !== 'invited') {
+    return sendJson(res, 409, { ok: false, error: 'Use Approve for entries that haven\'t been invited yet.' });
+  }
+
+  if (!getEffectiveDropAdminKey()) {
+    return sendJson(res, 500, { ok: false, error: 'No DROP admin key configured. Save one in Settings or set DROP_ADMIN_API_KEY.' });
+  }
+
+  const result = await reprovisionAccount(entry.username);
+
+  if (result.code === 'not_found') {
+    // Escape hatch: the DROP-side account is gone, and re-invite can never
+    // succeed again for it. Flip back to 'approved' so the admin can
+    // re-approve (which provisions a fresh account) instead of being stuck —
+    // 'invited' entries are blocked from Approve's first-invite-only path.
+    entry.status = 'approved';
+    entry.username = null;
+    entry.invitedAt = null;
+    entry.updatedAt = new Date().toISOString();
+    await save();
+    return sendJson(res, 409, {
+      ok: false,
+      error: 'DROP account no longer exists — entry reset to Approved; approve again to create a fresh account.',
+    });
+  }
+  if (result.code === 'disabled') {
+    return sendJson(res, 409, { ok: false, error: 'DROP account is suspended — re-enable it in DROP first.' });
+  }
+  if (!result.ok) return sendJson(res, 502, { ok: false, error: result.error });
+
+  const emailResult = await sendInviteEmail(entry, { username: result.username, tempPassword: result.password });
+
+  entry.invitedAt = new Date().toISOString();
+  entry.updatedAt = entry.invitedAt;
+  await save();
+
+  return sendJson(res, 200, {
+    ok: true, username: result.username,
     emailSent: emailResult.sent, emailError: emailResult.error || null,
     tempPassword: emailResult.sent ? undefined : result.password,
   });
@@ -302,7 +353,7 @@ function handleExportCsv(res) {
 }
 
 module.exports = {
-  handleJoin, listEntries, handleApprove,
+  handleJoin, listEntries, handleApprove, handleReinvite,
   handleGetSettings, handleSaveSettings, handleResetSettings, handleTestEmail,
   handleSaveTemplate, handleResetTemplate, handleExportCsv,
 };

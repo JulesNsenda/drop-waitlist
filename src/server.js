@@ -9,7 +9,7 @@ const { send, sendJson, adminAuthorized } = require('./http');
 const { serveStatic } = require('./static');
 const { isInvitesEnabled } = require('./settings');
 const {
-  handleJoin, listEntries, handleApprove,
+  handleJoin, listEntries, handleApprove, handleReinvite,
   handleGetSettings, handleSaveSettings, handleResetSettings, handleTestEmail,
   handleSaveTemplate, handleResetTemplate, handleExportCsv,
 } = require('./routes');
@@ -45,6 +45,10 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/admin/approve' && req.method === 'POST') {
       if (!adminAuthorized(req)) return sendJson(res, 403, { ok: false, error: 'Forbidden' });
       return await handleApprove(req, res);
+    }
+    if (p === '/api/admin/reinvite' && req.method === 'POST') {
+      if (!adminAuthorized(req)) return sendJson(res, 403, { ok: false, error: 'Forbidden' });
+      return await handleReinvite(req, res);
     }
     if (p === '/api/admin/settings' && req.method === 'GET') {
       if (!adminAuthorized(req)) return sendJson(res, 403, { ok: false, error: 'Forbidden' });

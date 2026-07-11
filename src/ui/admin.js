@@ -123,6 +123,7 @@
   const confirmDialogCancelBtn = document.getElementById('confirm-dialog-cancel');
 
   const credsDialogEl   = document.getElementById('creds-dialog');
+  const credsDialogTitleEl = document.getElementById('creds-dialog-title');
   const credsUsernameEl = document.getElementById('creds-username');
   const credsPasswordEl = document.getElementById('creds-password');
   const credsCopyBtn    = document.getElementById('creds-copy-btn');
@@ -255,7 +256,8 @@
   }
 
   // ── credentials dialog (body-level, non-dismissable) ──────────────────────
-  function openCredsDialog(data) {
+  function openCredsDialog(data, title) {
+    credsDialogTitleEl.textContent = title || 'Account created';
     credsUsernameEl.textContent = data.username;
     credsPasswordEl.textContent = data.tempPassword;
     if (data.emailError) {
@@ -533,6 +535,11 @@
       info.className = 'invited-info';
       info.textContent = (entry.username || '') + (entry.invitedAt ? ' · ' + fmtDateSafe(entry.invitedAt) : '');
       actionCell.appendChild(info);
+
+      const reinviteBtn = document.createElement('button');
+      reinviteBtn.textContent = 'Re-invite';
+      reinviteBtn.addEventListener('click', () => handleReinvite(entry, reinviteBtn));
+      actionCell.appendChild(reinviteBtn);
     } else if (entry.status === 'pending' || (entry.status === 'approved' && state.invitesEnabled)) {
       const btn = document.createElement('button');
       btn.textContent = entry.status === 'pending'
@@ -589,6 +596,17 @@
     waitlistUpdatedEl.textContent = state.lastUpdated ? 'Updated ' + fmtTime(state.lastUpdated) : '';
   }
 
+  // Shared by approve (on account creation) and re-invite: both end in one of
+  // the same two outcomes — a failed welcome email surfaces the one-time creds
+  // dialog (with a title suited to the calling action), otherwise a toast.
+  function renderProvisionOutcome(result, opts) {
+    if (result.emailSent === false) {
+      openCredsDialog({ username: result.username, tempPassword: result.tempPassword, emailError: result.emailError }, opts.title);
+    } else {
+      showToast(opts.successToast, false);
+    }
+  }
+
   async function handleApprove(entryId, btnEl) {
     const originalLabel = btnEl.textContent;
     btnEl.disabled = true;
@@ -618,16 +636,48 @@
       }
       renderWaitlistView();
 
-      if (result.created && !result.emailSent) {
-        openCredsDialog({ username: result.username, tempPassword: result.tempPassword, emailError: result.emailError });
-      } else if (result.created) {
-        showToast('Invited ' + result.username + ' — welcome email sent.', false);
+      if (result.created) {
+        renderProvisionOutcome(result, { successToast: 'Invited ' + result.username + ' — welcome email sent.' });
       } else {
         showToast(result.message || 'Marked approved.', false);
       }
     } catch (err) {
       if (err === SENTINEL_ABORT) return;
       showToast(err.message || 'Approve failed — network error.', true);
+      btnEl.disabled = false;
+      btnEl.textContent = originalLabel;
+    }
+  }
+
+  async function handleReinvite(entry, btnEl) {
+    const confirmed = await confirmDialog(
+      'Re-invite ' + entry.email + '? This resets their DROP password and emails new credentials — any password they\'ve already set will stop working.'
+    );
+    if (!confirmed) return;
+
+    const originalLabel = btnEl.textContent;
+    btnEl.disabled = true;
+    btnEl.textContent = 'Re-inviting…';
+    try {
+      const result = await api('/api/admin/reinvite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: entry.id }),
+      });
+      if (!result.ok) {
+        showToast(result.error || 'Re-invite failed.', true);
+        return;
+      }
+
+      renderProvisionOutcome(result, {
+        successToast: 'Re-invited ' + result.username + ' — new credentials emailed.',
+        title: 'Credentials reset',
+      });
+      refreshEntries();
+    } catch (err) {
+      if (err === SENTINEL_ABORT) return;
+      showToast(err.message || 'Re-invite failed — network error.', true);
+    } finally {
       btnEl.disabled = false;
       btnEl.textContent = originalLabel;
     }
