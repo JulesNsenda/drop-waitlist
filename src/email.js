@@ -1,8 +1,8 @@
 'use strict';
 
-const { RESEND_API_KEY, DASHBOARD_URL } = require('./config');
+const { RESEND_API_KEY } = require('./config');
 const { getTemplates } = require('./store');
-const { getEffectiveEmailSettings } = require('./settings');
+const { getEffectiveEmailSettings, getEffectiveDashboardUrl } = require('./settings');
 const { smtpSend } = require('./smtp');
 
 // ── default templates ─────────────────────────────────────────────────────────
@@ -154,8 +154,9 @@ function sendConfirmationEmail(entry) {
   return sendEmail({ to: entry.email, subject: tmpl.subject, html });
 }
 
-// Sends the beta-invite email. DASHBOARD_URL injected from config here so
-// routes.js never needs to import it.
+// Sends the beta-invite email. The dashboard URL is read via
+// getEffectiveDashboardUrl() at send time (not a frozen config constant) so
+// routes.js never needs to import it and a UI save takes effect immediately.
 function sendInviteEmail(entry, { username, tempPassword }) {
   const tmpl = getEffectiveTemplate('invite');
   const html = renderTemplate(tmpl.html, {
@@ -163,7 +164,7 @@ function sendInviteEmail(entry, { username, tempPassword }) {
     email: entry.email,
     username,
     tempPassword,
-    dashboardUrl: DASHBOARD_URL,
+    dashboardUrl: getEffectiveDashboardUrl(),
   });
   return sendEmail({ to: entry.email, subject: tmpl.subject, html });
 }

@@ -85,10 +85,10 @@ function getSettings() {
   return store.settings;
 }
 
-// `key` is 'email', 'invitesEnabled', or 'dropAdminKey'. `value` is the
-// already-validated shape (settings.js owns validation) — email is stored
-// as-is plus savedAt; invitesEnabled and dropAdminKey are wrapped in
-// {value, savedAt} to carry their own save time.
+// `key` is 'email', 'invitesEnabled', 'dropAdminKey', or 'dashboardUrl'.
+// `value` is the already-validated shape (settings.js owns validation) —
+// email is stored as-is plus savedAt; invitesEnabled, dropAdminKey, and
+// dashboardUrl are wrapped in {value, savedAt} to carry their own save time.
 function setSettingsSection(key, value) {
   if (key === 'email') {
     store.settings.email = { ...value, savedAt: new Date().toISOString() };
@@ -96,6 +96,8 @@ function setSettingsSection(key, value) {
     store.settings.invitesEnabled = { value: !!value, savedAt: new Date().toISOString() };
   } else if (key === 'dropAdminKey') {
     store.settings.dropAdminKey = { value, savedAt: new Date().toISOString() };
+  } else if (key === 'dashboardUrl') {
+    store.settings.dashboardUrl = { value, savedAt: new Date().toISOString() };
   } else {
     throw new Error('invalid settings key');
   }

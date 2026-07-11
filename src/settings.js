@@ -1,6 +1,6 @@
 'use strict';
 
-const { RESEND_API_KEY, EMAIL_FROM, INVITES_ENABLED, DROP_ADMIN_API_KEY, EMAIL_RE } = require('./config');
+const { RESEND_API_KEY, EMAIL_FROM, INVITES_ENABLED, DROP_ADMIN_API_KEY, DASHBOARD_URL_BASE, DROP_API_URL, EMAIL_RE } = require('./config');
 const { getSettings } = require('./store');
 
 // Owns: settings validation, the "stored || env-derived default" effective
@@ -19,6 +19,7 @@ const MAX_ADDR_LEN = 320; // email / username-as-address fields
 const MAX_HOST_LEN = 253;
 const MAX_FROM_LEN = 200;
 const MAX_PASSWORD_LEN = 500;
+const MAX_URL_LEN = 2048;
 
 // Reject bare CR/LF (header injection) and other C0/DEL control characters.
 // Reused here for from/host/username and by routes.js for template subjects.
@@ -80,6 +81,33 @@ function getEffectiveDropAdminKey() {
     return stored.value;
   }
   return DROP_ADMIN_API_KEY;
+}
+
+// Read at call time so a UI save takes effect immediately (no restart, no
+// frozen-constant trap). Single canonical `/dashboard` append site — whoever
+// wins (stored base | env base | DROP_API_URL) gets suffixed exactly once.
+function getEffectiveDashboardUrl() {
+  const stored = getSettings().dashboardUrl;
+  const storedBase = (stored && typeof stored === 'object' && typeof stored.value === 'string' && stored.value)
+    ? stored.value
+    : '';
+  return (storedBase || DASHBOARD_URL_BASE || DROP_API_URL).replace(/\/$/, '') + '/dashboard';
+}
+
+// Internal-only helper for buildInvitesView's warning flag. Keyed off the
+// *effective* host, independent of source — an env var pointed at an
+// internal host is equally dead as a stored one. An unparseable effective
+// URL is treated as internal too (equally unreachable from a browser).
+const INTERNAL_HOSTS = new Set(['drop-host', '127.0.0.1', 'localhost', '::1', '0.0.0.0']);
+function isDashboardUrlInternal() {
+  try {
+    const url = new URL(getEffectiveDashboardUrl());
+    let host = url.hostname.toLowerCase();
+    if (host.startsWith('[') && host.endsWith(']')) host = host.slice(1, -1);
+    return INTERNAL_HOSTS.has(host);
+  } catch {
+    return true;
+  }
 }
 
 // ── validation ──────────────────────────────────────────────────────────────
@@ -182,6 +210,44 @@ function validateDropAdminKey(value) {
   return { ok: true, value: trimmed };
 }
 
+// Validates a POST /api/admin/settings `dashboardUrl` value (Option A: base +
+// append `/dashboard`, locked by docs/plans/2026-07-11-dashboard-url-ui-setting.md).
+// Stores a normalized BASE (no trailing slash, no trailing /dashboard segment)
+// — never the full suffixed URL — so getEffectiveDashboardUrl has a single
+// canonical append site. Does not auto-prepend a scheme: a scheme-less input
+// like "dropkit.sh" is rejected with an actionable message instead of guessed.
+function validateDashboardUrl(value) {
+  if (typeof value !== 'string') return { ok: false, error: 'dashboardUrl must be a string' };
+  const trimmed = value.trim();
+  if (!trimmed) return { ok: false, error: 'dashboardUrl must not be empty' };
+  if (trimmed.length > MAX_URL_LEN) return { ok: false, error: `dashboardUrl must be ${MAX_URL_LEN} characters or fewer` };
+  if (hasControlChars(trimmed)) return { ok: false, error: 'dashboardUrl contains invalid control characters' };
+
+  let url;
+  try {
+    url = new URL(trimmed);
+  } catch {
+    return { ok: false, error: 'dashboardUrl must be a valid URL including http:// or https://' };
+  }
+
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    return { ok: false, error: 'dashboardUrl must use http:// or https://' };
+  }
+  if (url.username) {
+    return { ok: false, error: 'dashboardUrl must not contain a username/password' };
+  }
+
+  // Normalize on the parsed pathname (never the raw string): strip one
+  // trailing slash, then strip a trailing `/dashboard` segment — leading-slash
+  // anchored + case-insensitive so a host like `mydashboard` or a segment like
+  // `dashboard-foo` is left untouched. `search`/`hash` are dropped by
+  // construction (we rebuild from `origin` + pathname only).
+  let pathname = url.pathname.replace(/\/$/, '');
+  pathname = pathname.replace(/\/dashboard\/?$/i, '');
+
+  return { ok: true, value: url.origin + pathname };
+}
+
 // ── allowlisted API views — never spread the settings object (see INVARIANT) ──
 
 function buildEmailView() {
@@ -205,11 +271,18 @@ function buildInvitesView() {
   const stored = getSettings().invitesEnabled;
   const storedKey = getSettings().dropAdminKey;
   const dropKeySaved = storedKey && typeof storedKey === 'object' && typeof storedKey.value === 'string' && storedKey.value;
+  const storedDashboardUrl = getSettings().dashboardUrl;
+  const dashboardUrlSaved = storedDashboardUrl && typeof storedDashboardUrl === 'object'
+    && typeof storedDashboardUrl.value === 'string' && storedDashboardUrl.value;
   return {
     enabled: isInvitesEnabled(),
     savedAt: (stored && typeof stored === 'object' && stored.savedAt) || null,
     dropKeySavedAt: (dropKeySaved && storedKey.savedAt) || null,
     dropKeyEnvSet: !!DROP_ADMIN_API_KEY,
+    dashboardUrl: getEffectiveDashboardUrl(),
+    dashboardUrlSavedAt: (dashboardUrlSaved && storedDashboardUrl.savedAt) || null,
+    dashboardUrlEnvSet: !!DASHBOARD_URL_BASE,
+    dashboardUrlInternal: isDashboardUrlInternal(),
   };
 }
 
@@ -227,9 +300,11 @@ module.exports = {
   getEffectiveEmailSettings,
   isInvitesEnabled,
   getEffectiveDropAdminKey,
+  getEffectiveDashboardUrl,
   validateEmailSection,
   validateInvitesEnabled,
   validateDropAdminKey,
+  validateDashboardUrl,
   buildEmailView,
   buildInvitesView,
   isEmailConfigured,

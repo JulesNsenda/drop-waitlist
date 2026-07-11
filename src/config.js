@@ -13,13 +13,15 @@ const INVITES_ENABLED = process.env.WAITLIST_INVITES_ENABLED === 'true';
 const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
 const EMAIL_FROM = process.env.EMAIL_FROM || 'DROP <onboarding@resend.dev>';
 
-// MUST stay env-only: the DROP admin key below is UI-configurable, and a
-// UI-settable URL next to it would let an admin-token holder exfiltrate the
-// key by redirecting provisioning (which sends the key as a Bearer header)
-// to a host they control.
+// DROP_API_URL MUST stay env-only: it's the Bearer/provisioning destination,
+// and a UI-settable value there could let an admin-token holder exfiltrate
+// the DROP admin key by redirecting provisioning (which sends the key as a
+// Bearer header) to a host they control. DASHBOARD_URL (the invite-email
+// link) is intentionally UI-settable — it's only ever rendered as a link and
+// never carries the key, so there's no exfiltration surface.
 const DROP_API_URL = (process.env.DROP_API_URL || 'http://127.0.0.1:3000').replace(/\/$/, '');
 const DROP_ADMIN_API_KEY = process.env.DROP_ADMIN_API_KEY || '';
-const DASHBOARD_URL = (process.env.DASHBOARD_URL || DROP_API_URL).replace(/\/$/, '') + '/dashboard';
+const DASHBOARD_URL_BASE = process.env.DASHBOARD_URL || '';
 
 const WAITLIST_JOIN_LIMIT = parseInt(process.env.WAITLIST_JOIN_LIMIT || '20', 10);
 const WAITLIST_JOIN_WINDOW_MS = parseInt(process.env.WAITLIST_JOIN_WINDOW_MS || '3600000', 10);
@@ -39,7 +41,7 @@ module.exports = {
   EMAIL_FROM,
   DROP_API_URL,
   DROP_ADMIN_API_KEY,
-  DASHBOARD_URL,
+  DASHBOARD_URL_BASE,
   WAITLIST_JOIN_LIMIT,
   WAITLIST_JOIN_WINDOW_MS,
   WAITLIST_EMAIL_BUDGET_PER_HOUR,

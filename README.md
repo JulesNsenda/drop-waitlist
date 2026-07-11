@@ -39,7 +39,7 @@ in Settings; a few are hard secrets that stay env-only forever.
 | `WAITLIST_ADMIN_TOKEN` | **yes** | Gate for `/admin`. Admin endpoints fail closed (403) if unset. Env-only — never readable or writable via Settings. |
 | `DROP_ADMIN_API_KEY` | for invites | A DROP **admin** API key (create one in the dashboard) used to create beta accounts. Fallback used until a key is saved in the admin UI → Settings (Invites card), where a saved key wins. Write-only there — never readable via Settings or any API response. |
 | `DROP_API_URL` | no | DROP API base (default `http://127.0.0.1:3000`). Use the host gateway under Docker isolation. |
-| `DASHBOARD_URL` | no | Base for the dashboard link in the welcome email (defaults to `DROP_API_URL`). |
+| `DASHBOARD_URL` | no | Base for the dashboard link in the welcome email. Configurable from the admin UI → Settings (Invites card) as "Dashboard base URL"; a saved value wins. Seed/fallback until then (base URL — `/dashboard` is appended automatically; falls back further to `DROP_API_URL` if unset). |
 | `RESEND_API_KEY` | for Resend | [Resend](https://resend.com) API key. Env-only — set it, then pick "Resend" as the provider in Settings. |
 | `EMAIL_FROM` | no | **Seed only.** Fallback from address used until a from is saved in Settings, e.g. `DROP <noreply@dropkit.sh>`. |
 | `WAITLIST_INVITES_ENABLED` | no | **Seed only, default off.** Fallback used until the invites toggle is saved once in Settings. While off, approving only marks entries `approved` and creates **no** accounts. |

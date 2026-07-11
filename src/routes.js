@@ -5,7 +5,7 @@ const { normEmail, getEntries, findByEmail, findById, addEntry, save, getTemplat
 const { sendConfirmationEmail, sendInviteEmail, sendEmail, getEffectiveTemplate, DEFAULT_TEMPLATES, escapeHtml } = require('./email');
 const {
   getEffectiveEmailSettings, isInvitesEnabled, getEffectiveDropAdminKey,
-  validateEmailSection, validateInvitesEnabled, validateDropAdminKey,
+  validateEmailSection, validateInvitesEnabled, validateDropAdminKey, validateDashboardUrl,
   buildEmailView, buildInvitesView, isEmailConfigured, hasControlChars,
 } = require('./settings');
 const { provisionAccount } = require('./drop-api');
@@ -132,10 +132,10 @@ function handleGetSettings(res) {
   });
 }
 
-// Partial save: `{ email?, invitesEnabled?, dropAdminKey? }`. One validator
-// per present key. All present sections are validated first and only then
-// persisted, so an invalid later section can't leave an earlier one
-// half-saved; fresh views are built after the persist phase.
+// Partial save: `{ email?, invitesEnabled?, dropAdminKey?, dashboardUrl? }`.
+// One validator per present key. All present sections are validated first
+// and only then persisted, so an invalid later section can't leave an
+// earlier one half-saved; fresh views are built after the persist phase.
 async function handleSaveSettings(req, res) {
   const body = await readJsonBody(req);
   if (!body || typeof body !== 'object') return sendJson(res, 400, { ok: false, error: 'Invalid JSON.' });
@@ -143,11 +143,12 @@ async function handleSaveSettings(req, res) {
   const hasEmail = Object.prototype.hasOwnProperty.call(body, 'email');
   const hasInvites = Object.prototype.hasOwnProperty.call(body, 'invitesEnabled');
   const hasDropKey = Object.prototype.hasOwnProperty.call(body, 'dropAdminKey');
-  if (!hasEmail && !hasInvites && !hasDropKey) {
+  const hasDashboardUrl = Object.prototype.hasOwnProperty.call(body, 'dashboardUrl');
+  if (!hasEmail && !hasInvites && !hasDropKey && !hasDashboardUrl) {
     return sendJson(res, 400, { ok: false, error: 'No settings provided.' });
   }
 
-  let emailValue, invitesValue, dropKeyValue;
+  let emailValue, invitesValue, dropKeyValue, dashboardUrlValue;
 
   if (hasEmail) {
     const result = validateEmailSection(body.email);
@@ -167,6 +168,12 @@ async function handleSaveSettings(req, res) {
     dropKeyValue = result.value;
   }
 
+  if (hasDashboardUrl) {
+    const result = validateDashboardUrl(body.dashboardUrl);
+    if (!result.ok) return sendJson(res, 400, { ok: false, error: result.error });
+    dashboardUrlValue = result.value;
+  }
+
   const response = { ok: true };
 
   if (hasEmail) {
@@ -182,7 +189,11 @@ async function handleSaveSettings(req, res) {
     await setSettingsSection('dropAdminKey', dropKeyValue);
   }
 
-  if (hasInvites || hasDropKey) {
+  if (hasDashboardUrl) {
+    await setSettingsSection('dashboardUrl', dashboardUrlValue);
+  }
+
+  if (hasInvites || hasDropKey || hasDashboardUrl) {
     response.invites = buildInvitesView();
   }
 

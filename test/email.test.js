@@ -13,10 +13,43 @@ process.env.DROP_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'drop-waitlist
 delete process.env.RESEND_API_KEY;
 delete process.env.EMAIL_FROM;
 
-const { test } = require('node:test');
+const { test, after } = require('node:test');
 const assert = require('node:assert/strict');
 const { escapeHtml, renderTemplate, htmlToText, sendEmail, stripCrlf } = require('../src/email');
 const { getEffectiveEmailSettings } = require('../src/settings');
+
+// ── dashboard-URL round-trip harness ────────────────────────────────────────────
+// config.js/store.js/settings.js/email.js all capture env + require-time state,
+// so (mirroring test/drop-api.test.js) this section gets its own throwaway data
+// dir and a fresh require of the whole chain — including email.js itself, since
+// sendInviteEmail must be freshly bound to the settings.js this test configures.
+
+const dashboardUrlTmpDirs = [];
+
+after(() => {
+  for (const dir of dashboardUrlTmpDirs) {
+    try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* best effort */ }
+  }
+});
+
+function freshEmailModules(envOverrides = {}) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'drop-waitlist-email-dashboard-'));
+  dashboardUrlTmpDirs.push(dir);
+  process.env.DROP_DATA_DIR = dir;
+  for (const key of ['RESEND_API_KEY', 'DASHBOARD_URL', 'DROP_API_URL']) delete process.env[key];
+  for (const [k, v] of Object.entries(envOverrides)) {
+    if (v === undefined) delete process.env[k];
+    else process.env[k] = v;
+  }
+  for (const name of ['../src/config', '../src/store', '../src/settings', '../src/email']) {
+    delete require.cache[require.resolve(name)];
+  }
+  return {
+    store: require('../src/store'),
+    settings: require('../src/settings'),
+    email: require('../src/email'),
+  };
+}
 
 // ── escapeHtml ─────────────────────────────────────────────────────────────────
 
@@ -140,4 +173,42 @@ test('stripCrlf: strips \\r and \\n, leaving normal text untouched', () => {
 test('stripCrlf: null/undefined coerce to empty string', () => {
   assert.equal(stripCrlf(null), '');
   assert.equal(stripCrlf(undefined), '');
+});
+
+// ── sendInviteEmail: dashboard URL round-trip ───────────────────────────────────
+
+test('sendInviteEmail: invite email renders the effective (UI-saved) dashboard URL', async () => {
+  const { store, settings, email } = freshEmailModules({ RESEND_API_KEY: 'test-key' });
+  await store.loadStore();
+
+  const validated = settings.validateDashboardUrl('https://dropkit.example');
+  assert.equal(validated.ok, true);
+  await store.setSettingsSection('dashboardUrl', validated.value);
+  await store.setSettingsSection('email', {
+    provider: 'resend',
+    from: 'DROP <hello@drop.dev>',
+    smtp: { host: '', port: 465, security: 'tls', username: '', password: '' },
+  });
+
+  let capturedBody = null;
+  const originalFetch = global.fetch;
+  global.fetch = async (_url, opts) => {
+    capturedBody = JSON.parse(opts.body);
+    return { ok: true, status: 200, text: async () => '' };
+  };
+  try {
+    const result = await email.sendInviteEmail(
+      { email: 'invitee@example.com', name: 'Invitee' },
+      { username: 'invitee', tempPassword: 'temp-pass-123' }
+    );
+    assert.equal(result.sent, true, result.error);
+  } finally {
+    global.fetch = originalFetch;
+  }
+
+  assert.ok(capturedBody, 'fetch was never called');
+  assert.ok(
+    capturedBody.html.includes('https://dropkit.example/dashboard'),
+    `invite html missing effective dashboard link: ${capturedBody.html}`
+  );
 });

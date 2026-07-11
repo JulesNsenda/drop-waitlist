@@ -30,7 +30,7 @@ after(() => {
 // baseline on every freshModules() call (below) so one test's override (e.g.
 // RESEND_API_KEY: 'test-key') can never leak into a later test that doesn't
 // ask for it, regardless of execution order.
-const ENV_KEYS_UNDER_TEST = ['RESEND_API_KEY', 'WAITLIST_INVITES_ENABLED', 'DROP_ADMIN_API_KEY'];
+const ENV_KEYS_UNDER_TEST = ['RESEND_API_KEY', 'WAITLIST_INVITES_ENABLED', 'DROP_ADMIN_API_KEY', 'DASHBOARD_URL', 'DROP_API_URL'];
 
 // Sets env, drops the require cache for config/store/settings, and re-requires
 // them fresh. `seed`, if given, is written as waitlist.json before requiring
@@ -514,6 +514,164 @@ test('dropAdminKey: save/reset roundtrip — validated key wins over env, reset 
   await store.resetSettingsSection('dropAdminKey');
   assert.equal(store.getSettings().dropAdminKey, undefined);
   assert.equal(settings.getEffectiveDropAdminKey(), 'env-fallback-key');
+});
+
+// ── validateDashboardUrl ─────────────────────────────────────────────────────────
+
+test('validateDashboardUrl: rejects non-string, empty, and whitespace-only', async () => {
+  const { settings } = freshModules();
+  assert.equal(settings.validateDashboardUrl(42).ok, false);
+  assert.equal(settings.validateDashboardUrl(null).ok, false);
+  assert.equal(settings.validateDashboardUrl(undefined).ok, false);
+  assert.equal(settings.validateDashboardUrl({}).ok, false);
+  assert.equal(settings.validateDashboardUrl('').ok, false);
+  assert.equal(settings.validateDashboardUrl('   ').ok, false);
+});
+
+test('validateDashboardUrl: rejects a value exceeding the length cap', async () => {
+  const { settings } = freshModules();
+  const longUrl = 'https://example.com/' + 'a'.repeat(2048);
+  const result = settings.validateDashboardUrl(longUrl);
+  assert.equal(result.ok, false);
+});
+
+test('validateDashboardUrl: rejects interior control characters', async () => {
+  // Interior, not leading/trailing — validateDashboardUrl trims first, so a
+  // control char at either end would be stripped by trim() and wrongly pass
+  // (same gotcha covered for validateDropAdminKey above).
+  const { settings } = freshModules();
+  assert.equal(settings.validateDashboardUrl('https://example.com/\r\nfoo').ok, false);
+  assert.equal(settings.validateDashboardUrl('https://example.com/a\x07b').ok, false);
+});
+
+test('validateDashboardUrl: rejects a scheme-less host (no auto-prepend)', async () => {
+  const { settings } = freshModules();
+  const result = settings.validateDashboardUrl('dropkit.sh');
+  assert.equal(result.ok, false);
+  assert.match(result.error, /http:\/\/ or https:\/\//);
+});
+
+test('validateDashboardUrl: rejects javascript: and data: schemes', async () => {
+  const { settings } = freshModules();
+  assert.equal(settings.validateDashboardUrl('javascript:alert(1)').ok, false);
+  assert.equal(settings.validateDashboardUrl('data:text/html,hi').ok, false);
+});
+
+test('validateDashboardUrl: accepts a bare origin unchanged', async () => {
+  const { settings } = freshModules();
+  const result = settings.validateDashboardUrl('https://dropkit.sh');
+  assert.equal(result.ok, true);
+  assert.equal(result.value, 'https://dropkit.sh');
+});
+
+test('validateDashboardUrl: accepts plain http:// (not only https://)', async () => {
+  const { settings } = freshModules();
+  const result = settings.validateDashboardUrl('http://dev.local:8080');
+  assert.equal(result.ok, true);
+  assert.equal(result.value, 'http://dev.local:8080');
+});
+
+test('validateDashboardUrl: strips a trailing /dashboard segment', async () => {
+  const { settings } = freshModules();
+  assert.equal(settings.validateDashboardUrl('https://dropkit.sh/dashboard').value, 'https://dropkit.sh');
+});
+
+test('validateDashboardUrl: strips a trailing /dashboard/ (with slash)', async () => {
+  const { settings } = freshModules();
+  assert.equal(settings.validateDashboardUrl('https://dropkit.sh/dashboard/').value, 'https://dropkit.sh');
+});
+
+test('validateDashboardUrl: drops query and fragment', async () => {
+  const { settings } = freshModules();
+  assert.equal(settings.validateDashboardUrl('https://x/dashboard?a=1#f').value, 'https://x');
+});
+
+test('validateDashboardUrl: strips only the trailing /dashboard segment, preserving a custom path prefix', async () => {
+  const { settings } = freshModules();
+  assert.equal(settings.validateDashboardUrl('https://x/app/dashboard').value, 'https://x/app');
+});
+
+test('validateDashboardUrl: does not strip a non-terminal "dashboard-foo" segment', async () => {
+  const { settings } = freshModules();
+  assert.equal(settings.validateDashboardUrl('https://x/dashboard-foo').value, 'https://x/dashboard-foo');
+});
+
+// ── getEffectiveDashboardUrl: precedence ─────────────────────────────────────────
+
+test('getEffectiveDashboardUrl: stored base wins and gets /dashboard appended once', async () => {
+  const { store, settings } = freshModules({ DASHBOARD_URL: undefined, DROP_API_URL: undefined });
+  await store.loadStore();
+  const validated = settings.validateDashboardUrl('https://dropkit.sh');
+  assert.equal(validated.ok, true);
+  await store.setSettingsSection('dashboardUrl', validated.value);
+  assert.equal(settings.getEffectiveDashboardUrl(), 'https://dropkit.sh/dashboard');
+});
+
+test('getEffectiveDashboardUrl: no stored value falls back to DASHBOARD_URL env base + /dashboard', async () => {
+  const { store, settings } = freshModules({ DASHBOARD_URL: 'https://env-base.example', DROP_API_URL: undefined });
+  await store.loadStore();
+  assert.equal(settings.getEffectiveDashboardUrl(), 'https://env-base.example/dashboard');
+});
+
+test('getEffectiveDashboardUrl: neither stored nor DASHBOARD_URL set falls back to the DROP_API_URL default', async () => {
+  const { store, settings } = freshModules({ DASHBOARD_URL: undefined, DROP_API_URL: undefined });
+  await store.loadStore();
+  assert.equal(settings.getEffectiveDashboardUrl(), 'http://127.0.0.1:3000/dashboard');
+});
+
+// ── buildInvitesView: dashboardUrl fields ────────────────────────────────────────
+
+test('buildInvitesView: dashboardUrlSavedAt null and dashboardUrlEnvSet false when nothing set', async () => {
+  const { store, settings } = freshModules({ DASHBOARD_URL: undefined, DROP_API_URL: undefined });
+  await store.loadStore();
+  const view = settings.buildInvitesView();
+  assert.equal(view.dashboardUrlSavedAt, null);
+  assert.equal(view.dashboardUrlEnvSet, false);
+  assert.equal(view.dashboardUrl, 'http://127.0.0.1:3000/dashboard');
+});
+
+test('buildInvitesView: dashboardUrlEnvSet true when DASHBOARD_URL is set', async () => {
+  const { store, settings } = freshModules({ DASHBOARD_URL: 'https://env-base.example' });
+  await store.loadStore();
+  assert.equal(settings.buildInvitesView().dashboardUrlEnvSet, true);
+});
+
+test('buildInvitesView: dashboardUrlSavedAt is an ISO string once a base is saved via UI', async () => {
+  const { store, settings } = freshModules({ DASHBOARD_URL: undefined, DROP_API_URL: undefined });
+  await store.loadStore();
+  const validated = settings.validateDashboardUrl('https://dropkit.sh');
+  assert.equal(validated.ok, true);
+  await store.setSettingsSection('dashboardUrl', validated.value);
+  const view = settings.buildInvitesView();
+  assert.equal(typeof view.dashboardUrlSavedAt, 'string');
+  assert.ok(!Number.isNaN(new Date(view.dashboardUrlSavedAt).getTime()));
+});
+
+test('buildInvitesView: dashboardUrlInternal true for the drop-host and 127.0.0.1 defaults', async () => {
+  const dropHost = freshModules({ DASHBOARD_URL: 'http://drop-host:3000', DROP_API_URL: undefined });
+  await dropHost.store.loadStore();
+  assert.equal(dropHost.settings.buildInvitesView().dashboardUrlInternal, true);
+
+  const loopback = freshModules({ DASHBOARD_URL: undefined, DROP_API_URL: undefined });
+  await loopback.store.loadStore();
+  assert.equal(loopback.settings.buildInvitesView().dashboardUrlInternal, true);
+});
+
+test('buildInvitesView: dashboardUrlInternal true when the effective URL is unparseable', async () => {
+  const { store, settings } = freshModules(
+    { DASHBOARD_URL: undefined, DROP_API_URL: undefined },
+    { entries: [], templates: {}, settings: { dashboardUrl: { value: 'not a url at all', savedAt: '2020-01-01T00:00:00.000Z' } } }
+  );
+  await store.loadStore();
+  assert.equal(settings.buildInvitesView().dashboardUrlInternal, true);
+});
+
+test('buildInvitesView: dashboardUrlInternal false for a public https base', async () => {
+  const { store, settings } = freshModules({ DASHBOARD_URL: undefined, DROP_API_URL: undefined });
+  await store.loadStore();
+  const validated = settings.validateDashboardUrl('https://dropkit.sh');
+  await store.setSettingsSection('dashboardUrl', validated.value);
+  assert.equal(settings.buildInvitesView().dashboardUrlInternal, false);
 });
 
 // ── isEmailConfigured (provider-aware "usable" check) ────────────────────────────

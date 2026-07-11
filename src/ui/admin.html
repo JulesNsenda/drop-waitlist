@@ -176,6 +176,7 @@
               <button type="button" class="chip" data-var="{{dashboardUrl}}">{{dashboardUrl}}</button>
             </div>
             <p class="field-note">HTML is sent as-is. Inline CSS only — most email clients strip &lt;style&gt; blocks.</p>
+            <p class="field-note">{{dashboardUrl}} is configured in Settings › Invites.</p>
           </div>
           <div class="field">
             <span class="field-label">Preview</span>
@@ -312,6 +313,24 @@
           <button id="save-drop-key" type="button">Save</button>
           <button class="btn-ghost btn-danger" id="reset-drop-key" type="button">Reset to env…</button>
           <span class="save-msg" id="drop-key-msg" aria-live="polite"></span>
+        </div>
+
+        <div class="note" id="dashboard-url-warning" hidden>
+          The dashboard link in invite emails points to an internal address users
+          can't reach — set your public dashboard URL below.
+        </div>
+        <div class="field">
+          <label>Dashboard base URL</label>
+          <span class="static-value" id="dashboard-url-status"></span>
+        </div>
+        <div class="field">
+          <label for="dashboard-url-input">Base URL</label>
+          <input type="url" id="dashboard-url-input" autocomplete="off" placeholder="https://dropkit.sh  (/dashboard added automatically)">
+          <p class="field-note">Invite emails link to &lt;base&gt;/dashboard.</p>
+        </div>
+        <div class="editor-actions">
+          <button id="save-dashboard-url" type="button">Save</button>
+          <span class="save-msg" id="dashboard-url-msg" aria-live="polite"></span>
         </div>
       </div>
 

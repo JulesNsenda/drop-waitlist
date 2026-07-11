@@ -109,6 +109,11 @@
   const dropKeyMsgEl      = document.getElementById('drop-key-msg');
   const envDropKeyEl      = document.getElementById('env-drop-key');
   const envResendKeyEl    = document.getElementById('env-resend-key');
+  const dashboardUrlWarning  = document.getElementById('dashboard-url-warning');
+  const dashboardUrlStatusEl = document.getElementById('dashboard-url-status');
+  const dashboardUrlInput    = document.getElementById('dashboard-url-input');
+  const saveDashboardUrlBtn  = document.getElementById('save-dashboard-url');
+  const dashboardUrlMsgEl    = document.getElementById('dashboard-url-msg');
 
   const toastEl = document.getElementById('toast');
 
@@ -924,6 +929,22 @@
     // Never touch dropKeyInput.value here — a re-render triggered by an
     // unrelated save (email, invites toggle) must not wipe a typed key.
     dropKeyInput.placeholder = inv.dropKeySavedAt ? '(unchanged)' : '(not set)';
+
+    dashboardUrlWarning.hidden = !inv.dashboardUrlInternal;
+
+    if (inv.dashboardUrlSavedAt) {
+      dashboardUrlStatusEl.textContent = 'Configured via UI · saved ' + fmtDateTimeSafe(inv.dashboardUrlSavedAt) + ' — ' + inv.dashboardUrl;
+      dashboardUrlStatusEl.className = 'static-value ' + (inv.dashboardUrlInternal ? 'warn' : 'ok');
+    } else if (inv.dashboardUrlEnvSet) {
+      dashboardUrlStatusEl.textContent = 'Using env var (DASHBOARD_URL) — ' + inv.dashboardUrl;
+      dashboardUrlStatusEl.className = 'static-value ' + (inv.dashboardUrlInternal ? 'warn' : 'ok');
+    } else {
+      dashboardUrlStatusEl.textContent = 'Not set — using internal default ' + inv.dashboardUrl + ', which users can\'t reach';
+      dashboardUrlStatusEl.className = 'static-value warn';
+    }
+    // Never touch dashboardUrlInput.value here — same reasoning as
+    // dropKeyInput: a re-render triggered by an unrelated save (email, drop
+    // key, invites toggle) must not wipe a URL the admin is mid-typing.
   }
 
   function renderEnvCard() {
@@ -1115,6 +1136,37 @@
     }
   }
 
+  async function handleSaveDashboardUrl() {
+    const value = dashboardUrlInput.value.trim();
+    if (!value) {
+      showInlineMsg(dashboardUrlMsgEl, 'Enter a URL first.', true);
+      return;
+    }
+
+    saveDashboardUrlBtn.disabled = true;
+    saveDashboardUrlBtn.textContent = 'Saving…';
+    try {
+      const result = await api('/api/admin/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dashboardUrl: value }),
+      });
+      if (!result.ok) {
+        showInlineMsg(dashboardUrlMsgEl, result.error || 'Save failed.', true);
+      } else {
+        state.settings.invites = result.invites;
+        dashboardUrlInput.value = '';
+        renderInvitesCard();
+        showInlineMsg(dashboardUrlMsgEl, 'Saved.', false);
+      }
+    } catch (err) {
+      if (err !== SENTINEL_ABORT) showInlineMsg(dashboardUrlMsgEl, err.message || 'Save failed — network error.', true);
+    } finally {
+      saveDashboardUrlBtn.disabled = false;
+      saveDashboardUrlBtn.textContent = 'Save';
+    }
+  }
+
   async function handleResetDropKey() {
     const proceed = await confirmDialog(
       'Remove the key saved in Settings? The DROP_ADMIN_API_KEY env var (if set) will apply again.', 'Reset'
@@ -1166,6 +1218,7 @@
     invitesToggle.addEventListener('change', handleInvitesToggle);
     saveDropKeyBtn.addEventListener('click', handleSaveDropKey);
     resetDropKeyBtn.addEventListener('click', handleResetDropKey);
+    saveDashboardUrlBtn.addEventListener('click', handleSaveDashboardUrl);
   }
 
   // ── wire up ────────────────────────────────────────────────────────────────
